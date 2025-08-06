@@ -1,482 +1,342 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>The Vault Simulator</title>
   <style>
-    body { font-family: Arial; background: #f0f0f0; padding: 20px; }
-    h1 { text-align: center; }
-    textarea { width: 100%; height: 150px; }
-    button { margin: 10px 0; padding: 10px 20px; }
-    .section { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px #ccc; }
-    .log { white-space: pre-wrap; background: #eef; padding: 10px; border-radius: 5px; margin-top: 10px; }
-    .voting-matrix { margin-top: 10px; border-collapse: collapse; width: 100%; }
-    .voting-matrix th, .voting-matrix td { border: 1px solid #999; padding: 5px; text-align: center; }
-    .highlight { background: #d0f0d0; }
-    .gray { color: #aaa; }
-    .dropdown { max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; }
-    .vault { font-weight: bold; }
-    summary { cursor: pointer; }
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+    h2 { margin-top: 40px; }
+    #log, #votingMatrix, #juryMatrix, #progressTable, #allianceBox {
+      background: white; border: 1px solid #ccc; padding: 10px; margin-top: 10px;
+    }
+    #log { height: 150px; overflow-y: auto; }
+    textarea { width: 100%; height: 120px; }
+    button { margin: 5px 0; padding: 8px 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+    .keyholder { background: #d4edda; }
+    details { margin-top: 5px; }
+    .sidebar {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .sidebar > div { flex: 1; }
   </style>
 </head>
 <body>
-  <h1>The Vault Simulator</h1>
-  <div class="section">
-    <label>Enter 12 Players (one per line):</label>
-    <textarea id="playerInput"></textarea>
-    <button id="startBtn">Start Game</button>
-    <button id="nextRoundBtn" style="display:none;">Next Round</button>
+
+<h1>The Vault Simulator</h1>
+
+<textarea id="playerInput" placeholder="Enter one player per line (12 total)"></textarea>
+<button onclick="startGame()">Start Game</button>
+<button onclick="nextRound()" id="nextRoundBtn" style="display:none;">Next Round</button>
+
+<div class="sidebar">
+  <div>
+    <h2>Round Events</h2>
+    <div id="log"></div>
+
+    <h2>Voting Matrix</h2>
+    <div id="votingMatrix"></div>
+
+    <h2>Jury Key Matrix</h2>
+    <div id="juryMatrix"></div>
   </div>
+  <div>
+    <h2>Alliances</h2>
+    <div id="allianceBox"></div>
 
-  <div class="section" id="rightPanel">
-    <h3>Alliances</h3>
-    <div id="allianceBox" class="dropdown"></div>
+    <h2>Progress Chart</h2>
+    <div id="progressTable"></div>
   </div>
+</div>
 
-  <div class="section">
-    <h3>Round Events</h3>
-    <div id="eventLog" class="log"></div>
-    <div id="votingMatrixContainer"></div>
-  </div>
-
-  <div class="section">
-    <h3>Progress Chart</h3>
-    <div id="progressChart" class="log"></div>
-  </div>
-
-  <div class="section">
-    <h3>Final Jury Key Distribution</h3>
-    <div id="juryKeyMatrix" class="log"></div>
-  </div>
-
-  <script>
-    // ========== CORE GAME SCRIPT FOR THE VAULT ==========
-
-// FULL SCRIPT LOADING INCOMING IN PARTS DUE TO LENGTH
-// Part 2A, continue in next message...
-
-document.getElementById("startBtn").addEventListener("click", startGame);
-document.getElementById("nextRoundBtn").addEventListener("click", nextRound);
-
-let allPlayers = [];
+<script>
+let players = [];
 let activePlayers = [];
 let eliminatedPlayers = [];
-let phase = 1;
-let round = 1;
-let maxPhase1Rounds = 4;
-let phase1Keys = new Set();
-let phase2Keys = new Set();
-let finalists = [];
 let alliances = [];
+let round = 0;
+let phase = 1;
+let gameStarted = false;
 let lockpickHolder = null;
 let lockpickUsed = false;
-let lockpickRoundRevealed = false;
-let gameStarted = false;
-let currentVoteMatrix = "";
-let allVoteMatrices = [];
-let juryKeyMatrix = {};
-let juryKeysGiven = 0;
-let phase3Step = 0;
-let eventLog = document.getElementById("eventLog");
+let currentVoteMatrix = [];
 
 function startGame() {
-  const input = document.getElementById("playerInput").value.trim().split("\n");
-  if (input.length !== 12) {
-    alert("Enter exactly 12 players.");
-    return;
-  }
-
-  // Reset all data
-  allPlayers = input.map(name => ({
-    name: name.trim(),
-    key1: false,
-    key2: false,
-    key3: false,
-    eliminated: false,
-    alliances: [],
-    vault: null,
-    totalKeys: 0,
-  }));
-  activePlayers = [...allPlayers];
+  const input = document.getElementById("playerInput").value.trim().split("\n").map(x => x.trim()).filter(x => x);
+  if (input.length !== 12) return alert("Enter exactly 12 players.");
+  players = input.map(name => ({ name, eliminated: false, key1: false, key2: false, key3: false, votes: [], allianceIds: [] }));
+  activePlayers = [...players];
   eliminatedPlayers = [];
+  round = 0;
   phase = 1;
-  round = 1;
-  phase1Keys = new Set();
-  phase2Keys = new Set();
-  finalists = [];
-  alliances = [];
+  gameStarted = true;
   lockpickHolder = null;
   lockpickUsed = false;
-  lockpickRoundRevealed = false;
-  currentVoteMatrix = "";
-  allVoteMatrices = [];
-  juryKeyMatrix = {};
-  juryKeysGiven = 0;
-  phase3Step = 0;
-  gameStarted = true;
-
   generateAlliances();
-  displayAlliances();
+  updateAllianceBox();
   updateProgressChart();
-  updateEventLog(`Game started with 12 players. Phase 1 begins.`);
-  document.getElementById("startBtn").style.display = "none";
+  document.getElementById("nextRoundBtn").innerText = "Next Round";
   document.getElementById("nextRoundBtn").style.display = "inline-block";
-}
-
-function updateEventLog(message) {
-  eventLog.innerText = message;
-}
-
-function updateProgressChart() {
-  const chart = activePlayers.concat(eliminatedPlayers).map(p => {
-    const status = p.eliminated ? "❌" : "✅";
-    const keys = `${p.key1 ? "🔑" : "❌"} ${p.key2 ? "🔑" : "❌"} ${p.key3 ? "🔑" : "❌"}`;
-    return `${status} ${p.name}: ${keys}`;
-  });
-  document.getElementById("progressChart").innerText = chart.join("\n");
+  document.getElementById("log").innerHTML = "Game started with 12 players.";
+  document.getElementById("votingMatrix").innerHTML = "";
+  document.getElementById("juryMatrix").innerHTML = "";
 }
 
 function generateAlliances() {
-  const names = activePlayers.map(p => p.name);
-  alliances = [
-    {
-      name: "The Untucked Dolls",
-      members: shuffle(names).slice(0, 4)
-    },
-    {
-      name: "Pretty Problematic",
-      members: shuffle(names).slice(4, 8)
-    },
-    {
-      name: "Slaywatch",
-      members: shuffle(names).slice(8, 12)
-    }
-  ];
-  // Assign to player profiles
-  for (let a of alliances) {
-    for (let name of a.members) {
-      const player = allPlayers.find(p => p.name === name);
-      if (player && !player.alliances.includes(a.name)) {
-        player.alliances.push(a.name);
-      }
-    }
-  }
+  const a1 = { name: "Alliance A", members: shuffle([...players]).slice(0, 4) };
+  const a2 = { name: "Alliance B", members: shuffle([...players]).slice(0, 4) };
+  const a3 = { name: "Alliance C", members: shuffle([...players]).slice(0, 4) };
+  alliances = [a1, a2, a3];
+  players.forEach(p => p.allianceIds = []);
+  alliances.forEach((a, idx) => a.members.forEach(m => {
+    const player = players.find(p => p.name === m.name);
+    if (!player.allianceIds.includes(idx)) player.allianceIds.push(idx);
+  }));
 }
 
-function displayAlliances() {
-  const box = document.getElementById("allianceBox");
-  box.innerHTML = "";
-  for (let a of alliances) {
-    const div = document.createElement("div");
-    div.innerHTML = `<strong>${a.name}:</strong> ${a.members.join(", ")}`;
-    box.appendChild(div);
-  }
+function updateAllianceBox() {
+  let html = "";
+  alliances.forEach((a, i) => {
+    html += `<strong>${a.name}</strong>: ${a.members.map(m => m.name).join(", ")}<br>`;
+  });
+  document.getElementById("allianceBox").innerHTML = html;
 }
 
-// Helper function
+function updateProgressChart() {
+  let html = `<table><tr><th>Player</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th></tr>`;
+  players.forEach(p => {
+    const k1 = p.key1 ? "✅" : "";
+    const k2 = p.key2 ? "✅" : "";
+    const k3 = p.key3 ? "✅" : "";
+    html += `<tr><td>${p.name}</td><td>${k1}</td><td>${k2}</td><td>${k3}</td></tr>`;
+  });
+  html += `</table>`;
+  document.getElementById("progressTable").innerHTML = html;
+}
+
+function updateEventLog(text) {
+  document.getElementById("log").innerHTML = text;
+}
+
 function shuffle(array) {
-  const arr = [...array];
+  let arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
 }
-
-// CONTINUES IN PART 2B — Ready? Let me send it now.
-function getAlivePlayers() {
-  return activePlayers.filter(p => !p.eliminated);
-}
-
-function getPlayersWithKey(phaseNumber) {
-  return activePlayers.filter(p => p[`key${phaseNumber}`]);
-}
-
-function getPlayersWithoutKey(phaseNumber) {
-  return activePlayers.filter(p => !p[`key${phaseNumber}`] && !p.eliminated);
-}
-
-function getEligibleVoters() {
-  return getAlivePlayers();
-}
-
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+</script>
 
 function nextRound() {
   if (!gameStarted) return;
 
-  updateEventLog("");
+  // Clear previous voting matrix and log
+  document.getElementById("votingMatrix").innerHTML = "";
+  document.getElementById("juryMatrix").innerHTML = "";
 
   if (phase === 1) {
-    handlePhase1();
+    runPhase1();
   } else if (phase === 2) {
-    handlePhase2();
+    runPhase2();
   } else if (phase === 3) {
-    handlePhase3();
+    runPhase3();
   } else if (phase === 4) {
-    handleFinale();
+    runVaultFinale();
   }
 
   updateProgressChart();
 }
-function handlePhase1() {
-  if (round > maxPhase1Rounds) {
-    // Phase 1 ends
-    const noKeyPlayers = getPlayersWithoutKey(1);
-    noKeyPlayers.forEach(p => {
-      p.eliminated = true;
-      eliminatedPlayers.push(p);
-    });
-    activePlayers = getAlivePlayers();
-    updateEventLog(`Phase 1 ends. Eliminated: ${noKeyPlayers.map(p => p.name).join(", ")}`);
+
+function runPhase1() {
+  if (round >= 4) {
+    // Eliminate players without a key
+    const eliminated = players.filter(p => !p.key1);
+    eliminated.forEach(p => p.eliminated = true);
+    eliminatedPlayers.push(...eliminated);
+    activePlayers = players.filter(p => !p.eliminated);
+    updateEventLog("Phase 1 complete. Eliminated: " + eliminated.map(p => p.name).join(", "));
     phase = 2;
-    round = 1;
+    round = 0;
     return;
   }
 
-  const eligible = getPlayersWithoutKey(1);
-  const drawn = shuffle(eligible).slice(0, Math.min(4, eligible.length));
-  const lockpickChance = Math.random() < 0.33;
-  let lockpickUsedThisRound = false;
-  if (lockpickChance && !lockpickUsed) {
-    lockpickHolder = pickRandom(drawn);
+  const logLines = [];
+  logLines.push(`<strong>Phase 1 - Round ${round + 1}</strong>`);
+  const drawn = shuffle(activePlayers.filter(p => !p.key1)).slice(0, 4);
+  logLines.push("Drawn players: " + drawn.map(p => p.name).join(", "));
+
+  // Lockpick random discovery
+  if (!lockpickHolder && Math.random() < 0.33) {
+    const lucky = drawn[Math.floor(Math.random() * drawn.length)];
+    lockpickHolder = lucky.name;
+    logLines.push(`${lucky.name} found the Lockpick!`);
+  }
+
+  let voteWinner;
+  if (lockpickHolder && drawn.some(p => p.name === lockpickHolder)) {
+    voteWinner = players.find(p => p.name === lockpickHolder);
+    voteWinner.key1 = true;
+    logLines.push(`${voteWinner.name} used the Lockpick and claimed the vote key!`);
     lockpickUsed = true;
-    lockpickRoundRevealed = true;
-  }
-
-  const allVoters = getEligibleVoters();
-  const votes = {};
-  allVoters.forEach(voter => {
-    let voteFor;
-    if (lockpickRoundRevealed && lockpickHolder.name === voter.name) {
-      voteFor = lockpickHolder.name;
-    } else {
-      const allies = drawn.filter(p => p.alliances.some(a => voter.alliances.includes(a.name)));
-      voteFor = (allies.length > 0 ? pickRandom(allies) : pickRandom(drawn)).name;
-    }
-    votes[voter.name] = voteFor;
-  });
-
-  const tally = {};
-  for (let vote of Object.values(votes)) {
-    tally[vote] = (tally[vote] || 0) + 1;
-  }
-  const maxVotes = Math.max(...Object.values(tally));
-  const voteWinners = Object.keys(tally).filter(p => tally[p] === maxVotes);
-  const voteWinner = pickRandom(voteWinners);
-  const voteKeyWinner = allPlayers.find(p => p.name === voteWinner);
-  voteKeyWinner.key1 = true;
-
-  const challengePlayers = drawn.filter(p => p.name !== voteWinner && !p.key1);
-  const challengeWinner = pickRandom(challengePlayers);
-  challengeWinner.key1 = true;
-
-  updateVoteMatrix(round, votes, voteKeyWinner.name);
-  updateEventLog(
-    `Phase 1 - Round ${round}\nDrawn: ${drawn.map(p => p.name).join(", ")}\n` +
-    `${lockpickRoundRevealed ? `Lockpick used by ${lockpickHolder.name}!\n` : ""}` +
-    `Vote Key: ${voteWinner}, Challenge Key: ${challengeWinner.name}`
-  );
-
-  round++;
-  lockpickRoundRevealed = false;
-}
-function handlePhase2() {
-  if (round > maxPhase2Rounds) {
-    const noKeyPlayers = getPlayersWithoutKey(2);
-    noKeyPlayers.forEach(p => {
-      p.eliminated = true;
-      eliminatedPlayers.push(p);
-    });
-    activePlayers = getAlivePlayers();
-    updateEventLog(`Phase 2 ends. Eliminated: ${noKeyPlayers.map(p => p.name).join(", ")}`);
-    phase = 3;
-    round = 1;
-    return;
-  }
-
-  const noKey = getPlayersWithoutKey(2);
-  const keyholders = getPlayersWithKey(2);
-
-  let voteTargetPool = noKey.map(p => p.name);
-  const voters = getEligibleVoters();
-  const votes = {};
-  let voteCounts = {};
-
-  let lockpickUsedThisRound = false;
-  if (!lockpickUsed && Math.random() < 0.33) {
-    lockpickHolder = pickRandom(noKey);
-    lockpickUsed = true;
-    lockpickUsedThisRound = true;
-    voteWinner = lockpickHolder.name;
-  }
-
-  if (!lockpickUsedThisRound) {
-    voters.forEach(voter => {
-      let options = voteTargetPool;
-      let choice;
-      const allies = noKey.filter(p => p.alliances.some(a => voter.alliances.includes(a.name)));
-      choice = (allies.length > 0 ? pickRandom(allies) : pickRandom(noKey)).name;
-      votes[voter.name] = choice;
-      voteCounts[choice] = (voteCounts[choice] || 0) + 1;
-    });
-
-    const maxVotes = Math.max(...Object.values(voteCounts));
-    const tiedPlayers = Object.keys(voteCounts).filter(p => voteCounts[p] === maxVotes);
-
-    if (tiedPlayers.length > 1) {
-      const [p1, p2] = tiedPlayers.map(name => activePlayers.find(p => p.name === name));
-      const duelWinner = pickRandom([p1, p2]);
-      duelWinner.key2 = true;
-      updateVoteMatrix(round, votes, "Tie: " + tiedPlayers.join(", "));
-      updateEventLog(
-        `Phase 2 - Round ${round}\nTied Vote: ${tiedPlayers.join(" vs ")}\nDuel Winner: ${duelWinner.name}`
-      );
-    } else {
-      voteWinner = tiedPlayers[0];
-    }
-  }
-
-  if (!lockpickUsedThisRound && tiedPlayers.length === 1) {
-    const voteWinnerPlayer = activePlayers.find(p => p.name === voteWinner);
-    const targets = noKey.filter(p => p.name !== voteWinnerPlayer.name);
-    const duelOpponent = pickRandom(targets);
-    const duelWinner = pickRandom([voteWinnerPlayer, duelOpponent]);
-    duelWinner.key2 = true;
-
-    updateVoteMatrix(round, votes, voteWinner + " vs " + duelOpponent.name);
-    updateEventLog(
-      `Phase 2 - Round ${round}\nVote Winner: ${voteWinner}, Chose: ${duelOpponent.name}\nDuel Winner: ${duelWinner.name}`
-    );
-  }
-
-  round++;
-}
-function handlePhase3() {
-  if (round === 1) {
-    const finalFour = getAlivePlayers();
-    const votes = {};
-    const targets = finalFour.map(p => p.name);
-
-    finalFour.forEach(voter => {
-      const options = targets.filter(t => t !== voter.name);
-      const allies = finalFour.filter(p => p.name !== voter.name && p.alliances.some(a => voter.alliances.includes(a.name)));
-      const voteFor = (allies.length > 0 ? pickRandom(allies) : pickRandom(options)).name;
-      votes[voter.name] = voteFor;
-    });
-
-    const tally = {};
-    Object.values(votes).forEach(vote => tally[vote] = (tally[vote] || 0) + 1);
-    const maxVotes = Math.max(...Object.values(tally));
-    const topChoices = Object.keys(tally).filter(p => tally[p] === maxVotes);
-
-    if (topChoices.length === 2) {
-      const autoFinalists = finalFour.filter(p => !topChoices.includes(p.name));
-      const duelists = finalFour.filter(p => topChoices.includes(p.name));
-      duelists[0].key3 = true;
-      duelists[1].key3 = true;
-      duelFinalists = autoFinalists;
-      challengePending = true;
-      updateVoteMatrix(round, votes, "TIE");
-      updateEventLog(
-        `Phase 3 - Final 4 Vote (TIE)\nTied: ${topChoices.join(", ")}\nAuto-advancing: ${autoFinalists.map(p => p.name).join(", ")}`
-      );
-    } else {
-      const voteWinner = topChoices[0];
-      const winnerPlayer = allPlayers.find(p => p.name === voteWinner);
-      const others = finalFour.filter(p => p.name !== voteWinner);
-      const finalistChosen = pickRandom(others);
-      const duelists = others.filter(p => p.name !== finalistChosen.name);
-      winnerPlayer.key3 = true;
-      finalistChosen.key3 = true;
-      duelFinalists = duelists;
-      challengePending = true;
-      updateVoteMatrix(round, votes, voteWinner);
-      updateEventLog(
-        `Phase 3 - Final 4 Vote\nVote Winner: ${voteWinner} chose ${finalistChosen.name}\nDuel: ${duelFinalists.map(p => p.name).join(" vs ")}`
-      );
-    }
-
-    round++;
-    return;
-  }
-
-  if (challengePending && duelFinalists.length === 2) {
-    const winner = pickRandom(duelFinalists);
-    winner.key3 = true;
-    const loser = duelFinalists.find(p => p.name !== winner.name);
-    loser.eliminated = true;
-    eliminatedPlayers.push(loser);
-    activePlayers = getAlivePlayers();
-
-    updateEventLog(
-      `Phase 3 Duel Result\n${winner.name} wins the final spot!\nEliminated: ${loser.name}`
-    );
-    phase = 4;
-    round = 1;
-    setupVaultFinale();
-  }
-}
-function setupVaultFinale() {
-  finalists = getAlivePlayers();
-  vaults = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
-  shuffle(vaults);
-
-  finalists.forEach(player => {
-    const estTotal = 3 + Math.floor(Math.random() * 5); // Estimate jury support
-    const vaultChoice = vaults.find(v => v >= estTotal);
-    player.vaultChoice = vaultChoice || vaults[0];
-    vaults = vaults.filter(v => v !== player.vaultChoice);
-  });
-
-  distributeJuryKeys();
-}
-
-function distributeJuryKeys() {
-  juryKeyMatrix = {};
-  const totalKeys = 16;
-  let keysRemaining = totalKeys;
-
-  const jury = eliminatedPlayers;
-  jury.forEach(juror => {
-    const keysToGive = juror.phase === 1 ? 1 : juror.phase === 2 ? 2 : 4;
-    const keySplit = {};
-    const splitCount = Math.random() < 0.5 ? 1 : 2;
-    const targets = shuffle([...finalists]).slice(0, splitCount);
-    const perTarget = Math.floor(keysToGive / targets.length);
-    targets.forEach(t => {
-      keySplit[t.name] = perTarget;
-      t.juryKeys = (t.juryKeys || 0) + perTarget;
-    });
-    juryKeyMatrix[juror.name] = keySplit;
-    keysRemaining -= keysToGive;
-  });
-
-  let winner = null;
-  let bestVault = 0;
-  finalists.forEach(p => {
-    const totalKeys = 3 + (p.juryKeys || 0);
-    if (totalKeys >= p.vaultChoice && p.vaultChoice > bestVault) {
-      bestVault = p.vaultChoice;
-      winner = p;
-    }
-  });
-
-  if (!winner) {
-    winner = eliminatedPlayers.find(p => p.phase === 3); // 4th place
-    updateEventLog(`No finalist opened their vault.\n${winner.name} (4th place) wins by default.`);
+    lockpickHolder = null;
   } else {
-    updateEventLog(
-      `Vault Finale\n${winner.name} opens the ${bestVault}-key vault and wins!\nFinalist Keys:\n${finalists.map(p => `${p.name}: ${3 + (p.juryKeys || 0)} keys`).join("\n")}`
-    );
+    voteWinner = drawn[Math.floor(Math.random() * drawn.length)];
+    voteWinner.key1 = true;
+    logLines.push(`${voteWinner.name} won the vote and received a key.`);
   }
 
-  gameEnded = true;
-  document.getElementById("nextRoundBtn").innerText = "Simulate Again";
-  document.getElementById("nextRoundBtn").onclick = resetGame;
+  const challengers = drawn.filter(p => p.name !== voteWinner.name);
+  const challengeWinner = challengers[Math.floor(Math.random() * challengers.length)];
+  challengeWinner.key1 = true;
+  logLines.push(`${challengeWinner.name} won the challenge and received a key.`);
+
+  round++;
+  renderVotingMatrix([
+    { voter: "House", vote: voteWinner.name },
+    { voter: "Challenge", vote: challengeWinner.name }
+  ]);
+
+  updateEventLog(logLines.join("<br>"));
 }
-    </script>
+
+function runPhase2() {
+  if (round >= 4) {
+    const eliminated = activePlayers.filter(p => !p.key2);
+    eliminated.forEach(p => p.eliminated = true);
+    eliminatedPlayers.push(...eliminated);
+    activePlayers = players.filter(p => !p.eliminated);
+    updateEventLog("Phase 2 complete. Eliminated: " + eliminated.map(p => p.name).join(", "));
+    phase = 3;
+    round = 0;
+    return;
+  }
+
+  const logLines = [];
+  logLines.push(`<strong>Phase 2 - Round ${round + 1}</strong>`);
+
+  const eligible = activePlayers.filter(p => !p.key2);
+  let voteTarget;
+  let duelOpponent;
+
+  // Lockpick used
+  if (lockpickHolder && !lockpickUsed && Math.random() < 0.4) {
+    voteTarget = players.find(p => p.name === lockpickHolder);
+    lockpickUsed = true;
+    lockpickHolder = null;
+    logLines.push(`${voteTarget.name} used the Lockpick to override the vote!`);
+  } else {
+    voteTarget = eligible[Math.floor(Math.random() * eligible.length)];
+  }
+
+  // Pick opponent
+  const otherEligibles = eligible.filter(p => p.name !== voteTarget.name);
+  if (otherEligibles.length === 0) {
+    duelOpponent = voteTarget;
+  } else {
+    duelOpponent = otherEligibles[Math.floor(Math.random() * otherEligibles.length)];
+  }
+
+  const winner = Math.random() < 0.5 ? voteTarget : duelOpponent;
+  winner.key2 = true;
+  logLines.push(`${voteTarget.name} and ${duelOpponent.name} dueled. ${winner.name} won the key.`);
+
+  round++;
+  renderVotingMatrix([
+    { voter: "House", vote: voteTarget.name },
+    { voter: "Challenge", vote: winner.name }
+  ]);
+
+  updateEventLog(logLines.join("<br>"));
+}
+
+function runPhase3() {
+  const logLines = [];
+  if (round === 0) {
+    logLines.push(`<strong>Phase 3 - Final 4 Vote</strong>`);
+    const finalists = activePlayers;
+    const voteWinner = finalists[Math.floor(Math.random() * finalists.length)];
+    voteWinner.key3 = true;
+
+    const ally = finalists.filter(p => p.name !== voteWinner.name)[Math.floor(Math.random() * 3)];
+    ally.key3 = true;
+
+    const remaining = finalists.filter(p => p.name !== voteWinner.name && p.name !== ally.name);
+    const challengeWinner = remaining[Math.floor(Math.random() * remaining.length)];
+    challengeWinner.key3 = true;
+
+    const eliminated = remaining.find(p => p.name !== challengeWinner.name);
+    eliminated.eliminated = true;
+    eliminatedPlayers.push(eliminated);
+    activePlayers = finalists.filter(p => !p.eliminated);
+
+    logLines.push(`${voteWinner.name} won the vote and brought ${ally.name}.`);
+    logLines.push(`${challengeWinner.name} won the final duel.`);
+    logLines.push(`${eliminated.name} was eliminated.`);
+
+    renderVotingMatrix([
+      { voter: "House", vote: voteWinner.name },
+      { voter: "Pick", vote: ally.name },
+      { voter: "Duel", vote: challengeWinner.name }
+    ]);
+
+    updateEventLog(logLines.join("<br>"));
+    phase = 4;
+    round = 0;
+  }
+}
+
+function runVaultFinale() {
+  const logLines = [];
+  logLines.push(`<strong>The Vault Finale</strong>`);
+
+  const finalists = activePlayers;
+  const jury = eliminatedPlayers;
+
+  // Jury distributes keys
+  const keyDistribution = {};
+  finalists.forEach(f => keyDistribution[f.name] = 3);
+
+  jury.forEach(j => {
+    const keys = j.key3 ? 4 : j.key2 ? 2 : 1;
+    for (let i = 0; i < keys; i++) {
+      const target = finalists[Math.floor(Math.random() * finalists.length)];
+      keyDistribution[target.name]++;
+    }
+  });
+
+  let matrix = `<table><tr><th>Jury</th>`;
+  finalists.forEach(f => matrix += `<th>${f.name}</th>`);
+  matrix += `</tr>`;
+
+  jury.forEach(j => {
+    matrix += `<tr><td>${j.name}</td>`;
+    finalists.forEach(f => {
+      const count = Math.floor(Math.random() * 2); // random split
+      matrix += `<td>${count}</td>`;
+    });
+    matrix += `</tr>`;
+  });
+  matrix += `</table>`;
+  document.getElementById("juryMatrix").innerHTML = matrix;
+
+  const winner = Object.entries(keyDistribution).sort((a, b) => b[1] - a[1])[0][0];
+  logLines.push(`${winner} wins The Vault with the most keys!`);
+  updateEventLog(logLines.join("<br>"));
+  document.getElementById("nextRoundBtn").innerText = "Simulate Again";
+  document.getElementById("nextRoundBtn").onclick = () => location.reload();
+}
+
+function renderVotingMatrix(votes) {
+  let html = `<details open><summary>Voting Matrix</summary><table><tr><th>Voter</th><th>Vote</th></tr>`;
+  votes.forEach(v => {
+    html += `<tr><td>${v.voter}</td><td>${v.vote}</td></tr>`;
+  });
+  html += `</table></details>`;
+  document.getElementById("votingMatrix").innerHTML = html;
+}
 </body>
 </html>
