@@ -374,7 +374,7 @@ function updateTable() {
   let html = "<h3>Progress Table</h3><table><tr><th>Player</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th><th>Total Keys</th></tr>";
   for (let p of players) {
     const className = p.eliminated ? "eliminated" : "";
-    html += `<tr class="${className}"><td>${p.name}</td><td>${p.key1 ? "â" : ""}</td><td>${p.key2 ? "â" : ""}</td><td>${p.key3 ? "â" : ""}</td><td>${p.totalFinalKeys || p.totalKeys}</td></tr>`;
+    html += `<tr class="${className}"><td>${p.name}</td><td>${p.key1 ? "🗝️" : ""}</td><td>${p.key2 ? "🗝️" : ""}</td><td>${p.key3 ? "🗝️" : ""}</td><td>${p.totalFinalKeys || p.totalKeys}</td></tr>`;
   }
   html += "</table>";
   document.getElementById("progressTable").innerHTML = html;
