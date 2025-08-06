@@ -189,7 +189,7 @@
     showMatrix(`Phase 1 – Round ${round} Voting`, matrix);
 
     // Phase 1 ends after 4 rounds
-    if (round === 4) {
+     if (round === 4) {
       const eliminated = currentPlayers.filter(p => p.keys === 0);
       eliminated.forEach(p => {
         p.eliminated = true;
@@ -202,11 +202,11 @@
     } else {
       round++;
     }
+
+    updateAlliances();
+    updateProgressChart();
   }
 
-  updateAlliances();
-  updateProgressChart();
-}
   else if (phase === 2) {
     let noKeyPlayers = currentPlayers.filter(p => p.keys < 2);
     let matrix = [];
