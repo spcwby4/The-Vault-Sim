@@ -1,81 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
   <title>The Vault Simulator</title>
   <style>
-    body {
-      font-family: sans-serif;
-      display: flex;
-      gap: 20px;
-      padding: 20px;
-    }
-    #left, #right {
-      width: 50%;
-    }
-    textarea {
-      width: 100%;
-      height: 150px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #999;
-      padding: 5px;
-      text-align: center;
-    }
-    .eliminated {
-      background-color: #fdd;
-    }
-    #log {
-      margin-top: 10px;
-      background: #eee;
-      padding: 10px;
-      height: 300px;
-      overflow-y: auto;
-    }
-    #alliancesBox {
-      background: #eef;
-      padding: 10px;
-      margin-top: 10px;
-    }
-    details {
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      padding: 5px;
-    }
-    summary {
-      cursor: pointer;
-      font-weight: bold;
-    }
-    details[open] {
-      background: #f9f9f9;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 100px; }
+    button { margin-top: 10px; padding: 10px; }
+    table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5px; }
+    table { width: 100%; margin-top: 10px; }
+    th { background-color: #f0f0f0; }
+    .eliminated { background-color: #ddd; text-decoration: line-through; }
+    #log { height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-top: 10px; background: #fdfdfd; }
+    #liveVotingMatrix details, #votingChart details { margin-bottom: 8px; }
+    summary { font-weight: bold; cursor: pointer; }
+    h3 { margin-top: 25px; }
   </style>
 </head>
 <body>
-  <div id="left">
-    <h2>The Vault Simulator</h2>
-    <textarea id="playerInput" placeholder="Enter 12 players, one per line"></textarea><br>
-    <button id="startBtn" onclick="startGame()">Start Game</button>
-    <button id="nextBtn" onclick="runRound()" style="display:none;">Run Next Round</button>
-    <div id="log"></div>
-    <div id="liveVotingMatrix"></div>
-    <div id="votingChart"></div>
-  </div>
 
-  <div id="right">
-    <div id="alliancesBox"></div>
-    <div id="progressTable"></div>
-  </div>
+<h1>The Vault Simulator</h1>
+
+<textarea id="playerInput" placeholder="Enter 12 players, one per line..."></textarea>
+<br>
+<button id="startBtn" onclick="startGame()">Start Game</button>
+<button id="nextBtn" onclick="runRound()" style="display:none;">Next Round</button>
+
+<div id="alliancesBox"></div>
+<div id="log"></div>
+<div id="liveVotingMatrix"></div>
+<div id="progressTable"></div>
+<div id="votingChart"></div>
+
 <script>
 let players = [];
 let round = 1;
 let phase = 1;
+let phase3Step = 0;
 let finalists = [];
 let eliminated = [];
 let jury = [];
@@ -99,10 +59,35 @@ function startGame() {
 }
 
 function runRound() {
+  window.__logClearedThisRound = false;
   if (phase === 1) return runPhase1();
   if (phase === 2) return runPhase2();
-  if (phase === 3) return runPhase3();
+  if (phase === 3) return phase3Step === 0 ? runPhase3Vote() : runPhase3Challenge();
   if (phase === 4) return runFinale();
+}
+
+function assignAlliances() {
+  const a1 = shuffle(players).slice(0, 5);
+  const a2 = shuffle(players).slice(0, 5);
+  const a3 = shuffle(players).slice(0, 5);
+  for (let p of players) {
+    p.alliance = [];
+    if (a1.includes(p)) p.alliance.push("A");
+    if (a2.includes(p)) p.alliance.push("B");
+    if (a3.includes(p)) p.alliance.push("C");
+  }
+}
+
+function updateAlliancesBox() {
+  const allianceGroups = { A: [], B: [], C: [] };
+  for (let p of players) { p.alliance.forEach(a => allianceGroups[a].push(p.name)); }
+  let html = "<h3>Alliances</h3>";
+  for (let key in allianceGroups) {
+    html += `<strong>Alliance ${key}</strong><ul>`;
+    allianceGroups[key].forEach(name => html += `<li>${name}</li>`);
+    html += "</ul>";
+  }
+  document.getElementById("alliancesBox").innerHTML = html;
 }
 
 function runPhase1() {
@@ -122,7 +107,6 @@ function runPhase1() {
   log(`Phase 1 – Round ${round}`);
   log(`Drawn players: ${drawn.map(p => p.name).join(", ")}`);
 
-  // Lockpick chance
   if (!lockpickHolder && !lockpickUsed && Math.random() < 0.33) {
     lockpickHolder = drawn[Math.floor(Math.random() * drawn.length)];
     log(`${lockpickHolder.name} found the Lockpick!`);
@@ -131,7 +115,6 @@ function runPhase1() {
   const voters = players.filter(p => !p.eliminated);
   const votingDetails = [];
   const voteTally = {};
-
   let voteWinner;
 
   if (lockpickHolder && drawn.includes(lockpickHolder)) {
@@ -225,26 +208,27 @@ function runPhase2() {
   round++;
   updateTable();
 }
-function runPhase3() {
+function runPhase3Vote() {
   const active = players.filter(p => !p.eliminated && p.key1 && p.key2);
-  if (active.length !== 4) {
-    log("Error: Phase 3 requires 4 players.");
-    return;
-  }
-
-  log("Phase 3 – Final Cut");
-
-  const votes = {};
+  log(`Phase 3 – Final 4 Vote`);
   const votingDetails = [];
-
+  const voteTally = {};
   for (let v of active) {
-    const choices = active.filter(p => p.name !== v.name);
-    const voteFor = pickAllyOrRandom(v, choices);
+    const options = active.filter(p => p !== v);
+    const voteFor = pickAllyOrRandom(v, options);
     votingDetails.push({ voter: v.name, votee: voteFor.name });
-    votes[voteFor.name] = (votes[voteFor.name] || 0) + 1;
+    voteTally[voteFor.name] = (voteTally[voteFor.name] || 0) + 1;
   }
+  const sorted = Object.entries(voteTally).sort((a, b) => b[1] - a[1]);
+  log(`Votes cast. Click Next Round to resolve challenge.`);
+  window.phase3Votes = { sorted, votingDetails };
+  recordVotes(round, votingDetails, sorted[0][0], "Phase 3");
+  phase3Step = 1;
+}
 
-  const sorted = Object.entries(votes).sort((a,b)=>b[1]-a[1]);
+function runPhase3Challenge() {
+  const active = players.filter(p => !p.eliminated && p.key1 && p.key2);
+  const { sorted } = window.phase3Votes;
   let voteWinner;
   let pick, rest;
 
@@ -272,157 +256,99 @@ function runPhase3() {
       jury.push(p);
     } else {
       p.key3 = true;
+      p.totalKeys++;
     }
   });
 
-  recordVotes(round, votingDetails, sorted[0][0], "Phase 3");
-
   phase = 4;
   round = 1;
+  window.phase3Votes = null;
+  phase3Step = 0;
   updateTable();
 }
 
 function runFinale() {
-  log("Vault Finale");
-  const vaultSelections = [];
+  log("Vault Finale Begins!");
+  finalists.forEach(f => f.totalFinalKeys = 3);
+  let remainingKeys = 16;
 
-  for (let f of finalists) {
-    let estimate = f.totalKeys + 3;
-    let range = vaults.filter(v => v <= estimate + 2 && v >= estimate - 1 && !vaultSelections.includes(v));
-    f.vault = range[Math.floor(Math.random() * range.length)] || 3;
-    vaultSelections.push(f.vault);
-    f.totalFinalKeys = 3;
-    log(`${f.name} chooses the ${f.vault}-key vault.`);
+  for (let j of jury) {
+    const keysToGive = Math.min(remainingKeys, phase === 2 ? 2 : 1);
+    j.bonusKeysAssigned = {};
+    const receivers = shuffle(finalists).slice(0, Math.min(keysToGive, 2));
+    receivers.forEach(r => {
+      j.bonusKeysAssigned[r.name] = (j.bonusKeysAssigned[r.name] || 0) + 1;
+      r.totalFinalKeys++;
+      remainingKeys--;
+    });
   }
 
-  let totalKeys = 16;
-  jury.forEach(j => j.bonusKeysAssigned = {});
+  finalists.forEach(f => {
+    const guess = Math.min(...vaults.filter(k => k <= f.totalFinalKeys + 1).reverse());
+    f.vaultGuess = guess;
+  });
 
-  while (totalKeys > 0) {
-    for (let j of jury) {
-      if (totalKeys === 0) break;
-      const giveTo = pickAllyOrRandom(j, finalists);
-      giveTo.bonusKeys++;
-      giveTo.totalFinalKeys++;
-      j.bonusKeysAssigned[giveTo.name] = (j.bonusKeysAssigned[giveTo.name] || 0) + 1;
-      totalKeys--;
-    }
-  }
-
-  for (let f of finalists) {
-    log(`${f.name} ends with ${f.totalFinalKeys} keys.`);
-  }
-
-  const unlocked = finalists.filter(f => f.totalFinalKeys >= f.vault);
-  if (unlocked.length) {
-    unlocked.sort((a,b)=>b.vault - a.vault);
-    log(`${unlocked[0].name} opens the highest vault and wins the season!`);
+  const opened = finalists.filter(f => f.totalFinalKeys >= f.vaultGuess);
+  if (opened.length > 0) {
+    const winner = opened.sort((a, b) => b.vaultGuess - a.vaultGuess)[0];
+    log(`${winner.name} opens the ${winner.vaultGuess}-key vault and wins!`);
   } else {
-    const fourth = players.find(p => !p.eliminated && !finalists.includes(p));
-    log(`No vaults opened. ${fourth ? fourth.name : finalists[0].name} wins by default.`);
+    const altWinner = players.find(p => p.eliminated && !p.key3);
+    log(`No vaults opened. ${altWinner.name} (4th place) wins by default.`);
   }
 
-  // Jury Matrix
-  let juryLog = "<h3>Jury Key Distribution</h3><table><tr><th>Juror</th><th>Keys Given</th></tr>";
-  for (let juror of jury) {
-    juryLog += `<tr><td>${juror.name}</td><td>`;
-    juryLog += finalists.map(f => `${f.name}: ${juror.bonusKeysAssigned[f.name] || 0}`).join(" · ");
-    juryLog += "</td></tr>";
-  }
-  juryLog += "</table>";
-  document.getElementById("votingChart").innerHTML += juryLog;
-
-  phase = 5;
-  generateVotingChart();
   updateTable();
-}
 
-function assignAlliances() {
-  const a1 = shuffle(players).slice(0, 5);
-  const a2 = shuffle(players).slice(0, 5);
-  const a3 = shuffle(players).slice(0, 5);
-  for (let p of players) {
-    p.alliance = [];
-    if (a1.includes(p)) p.alliance.push("A");
-    if (a2.includes(p)) p.alliance.push("B");
-    if (a3.includes(p)) p.alliance.push("C");
-  }
+  // Jury vote matrix
+  let juryVoteTable = "<h3>Jury Key Vote Matrix</h3><table><tr><th>Juror</th>";
+  finalists.forEach(f => juryVoteTable += `<th>${f.name}</th>`);
+  juryVoteTable += "</tr>";
+  jury.forEach(j => {
+    juryVoteTable += `<tr><td>${j.name}</td>`;
+    finalists.forEach(f => {
+      const keys = j.bonusKeysAssigned?.[f.name] || 0;
+      juryVoteTable += `<td>${keys}</td>`;
+    });
+    juryVoteTable += "</tr>";
+  });
+  juryVoteTable += "</table>";
+  document.getElementById("votingChart").innerHTML += juryVoteTable;
 }
 
 function pickAllyOrRandom(player, options) {
-  const allies = options.filter(p => p !== player && p.alliance.some(a => player.alliance.includes(a)));
-  return allies.length ? allies[Math.floor(Math.random() * allies.length)] : options[Math.floor(Math.random() * options.length)];
+  const allies = options.filter(o => o.alliance.some(a => player.alliance.includes(a)));
+  return allies.length > 0 ? allies[Math.floor(Math.random() * allies.length)] : options[Math.floor(Math.random() * options.length)];
 }
 
 function shuffle(arr) {
-  return arr.map(a => [Math.random(), a]).sort().map(a => a[1]);
+  return arr.slice().sort(() => Math.random() - 0.5);
 }
 
 function log(text) {
-  document.getElementById("log").innerHTML += text + "<br>";
-  document.getElementById("log").scrollTop = 9999;
+  if (!window.__logClearedThisRound) {
+    document.getElementById("log").innerHTML = "";
+    window.__logClearedThisRound = true;
+  }
+  document.getElementById("log").innerHTML += `<div>${text}</div>`;
 }
 
 function updateTable() {
-  let html = "<h3>Progress Table</h3><table><tr><th>Name</th><th>Key 1</th><th>Key 2</th><th>Key 3</th><th>Total Keys</th><th>Final Keys</th><th>Vault</th></tr>";
+  let html = "<h3>Progress Chart</h3><table><tr><th>Player</th><th>Key 1</th><th>Key 2</th><th>Key 3</th><th>Total Keys</th></tr>";
   for (let p of players) {
-    html += `<tr${p.eliminated ? ' class="eliminated"' : ''}><td>${p.name}</td><td>${p.key1 ? "✅" : ""}</td><td>${p.key2 ? "✅" : ""}</td><td>${p.key3 ? "✅" : ""}</td><td>${p.totalKeys}</td><td>${p.totalFinalKeys || ""}</td><td>${p.vault || ""}</td></tr>`;
+    html += `<tr class="${p.eliminated ? 'eliminated' : ''}"><td>${p.name}</td><td>${p.key1 ? '✅' : ''}</td><td>${p.key2 ? '✅' : ''}</td><td>${p.key3 ? '✅' : ''}</td><td>${p.totalKeys}</td></tr>`;
   }
   html += "</table>";
   document.getElementById("progressTable").innerHTML = html;
 }
 
-function updateAlliancesBox() {
-  let html = "<h3>Alliances</h3><ul>";
-  for (let p of players) {
-    html += `<li>${p.name}: ${p.alliance.join(", ") || "None"}</li>`;
+function recordVotes(roundNum, votes, winner, phase) {
+  let html = `<details open><summary>${phase} – Round ${roundNum} Voting Matrix</summary><table><tr><th>Voter</th><th>Votee</th></tr>`;
+  for (let v of votes) {
+    html += `<tr><td>${v.voter}</td><td>${v.votee}</td></tr>`;
   }
-  html += "</ul>";
-  document.getElementById("alliancesBox").innerHTML = html;
-}
-
-function recordVotes(roundNum, details, selected, phaseName) {
-  votingChart.push({ roundNum, details, selected, phase: phaseName });
-  appendLiveVotingChart({ roundNum, details, selected, phase: phaseName });
-}
-
-function appendLiveVotingChart(vote) {
-  const tally = {};
-  vote.details.forEach(d => {
-    tally[d.votee] = (tally[d.votee] || 0) + 1;
-  });
-  const winner = vote.selected;
-  let html = `<details open>
-    <summary>${vote.phase} – Round ${vote.roundNum} (Winner: ${winner} ✅)</summary>
-    <table><tr><th>Voter</th><th>Voted For</th></tr>`;
-  vote.details.forEach(d => {
-    html += `<tr><td>${d.voter}</td><td>${d.votee}</td></tr>`;
-  });
-  html += `</table><div><strong>Vote Totals:</strong> `;
-  html += Object.entries(tally).map(([name, count]) => `${name}: ${count}`).join(" · ");
-  html += `</div></details>`;
-  document.getElementById("liveVotingMatrix").innerHTML += html;
-}
-
-function generateVotingChart() {
-  let html = '<h3>Final Voting Summary</h3>';
-  votingChart.forEach(vote => {
-    const tally = {};
-    vote.details.forEach(d => {
-      tally[d.votee] = (tally[d.votee] || 0) + 1;
-    });
-    const winner = vote.selected;
-    html += `<details>
-      <summary>${vote.phase} – Round ${vote.roundNum} (Winner: ${winner} ✅)</summary>
-      <table><tr><th>Voter</th><th>Voted For</th></tr>`;
-    vote.details.forEach(d => {
-      html += `<tr><td>${d.voter}</td><td>${d.votee}</td></tr>`;
-    });
-    html += `</table><div><strong>Vote Totals:</strong> `;
-    html += Object.entries(tally).map(([name, count]) => `${name}: ${count}`).join(" · ");
-    html += `</div></details>`;
-  });
-  document.getElementById("votingChart").innerHTML += html;
+  html += `<tr><td colspan="2"><strong>Vote Winner: ${winner}</strong></td></tr></table></details>`;
+  document.getElementById("liveVotingMatrix").innerHTML = html;
+  votingChart.push(html);
 }
 </script>
 </body>
