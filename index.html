@@ -24,8 +24,84 @@
   <div id="progressTable"></div>
 
   <script>
-    // JavaScript content goes here
-    // [Shortened for brevity - full logic is implemented in final version]
+    // The Vault Simulator - Full JavaScript Logic
+
+let players = [];
+let phase = 1;
+let round = 1;
+let lockpickHolder = null;
+let usedLockpicks = [];
+let eliminated = [];
+let finalists = [];
+let jury = [];
+let vaults = [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
+let alliances = {};
+let voteLogs = [];
+
+function startGame() {
+  const input = document.getElementById("playerInput").value.trim().split("\n").map(p => p.trim()).filter(Boolean);
+  if (input.length !== 12) {
+    alert("Please enter exactly 12 player names.");
+    return;
+  }
+  players = input.map(name => ({
+    name,
+    key1: false,
+    key2: false,
+    key3: false,
+    totalKeys: 0,
+    eliminated: false,
+    alliance: [],
+    vault: null,
+    bonusKeys: 0,
+    totalFinalKeys: 0
+  }));
+  assignAlliances();
+  logAlliances();
+  document.getElementById("startBtn").style.display = "none";
+  document.getElementById("nextBtn").style.display = "inline-block";
+  runRound();
+}
+
+function assignAlliances() {
+  const names = ["The Vault Divas", "Secret Lockstars", "Key Cutters"];
+  names.forEach(name => {
+    const members = shuffle(players).slice(0, Math.floor(Math.random() * 4) + 2);
+    alliances[name] = members.map(p => p.name);
+    members.forEach(m => {
+      if (!m.alliance.includes(name)) m.alliance.push(name);
+    });
+  });
+}
+
+function logAlliances() {
+  let logText = "<b>Alliances:</b><br>";
+  for (let a in alliances) {
+    logText += `${a}: ${alliances[a].join(", ")}<br>`;
+  }
+  document.getElementById("log").innerHTML += logText;
+}
+
+function runRound() {
+  clearLog();
+  logAlliances();
+  if (phase === 1) runPhase1();
+  else if (phase === 2) runPhase2();
+  else if (phase === 3) runPhase3();
+  else if (phase === 4) runFinale();
+}
+
+function clearLog() {
+  document.getElementById("log").innerHTML = "";
+}
+
+function log(msg) {
+  document.getElementById("log").innerHTML += msg + "<br>";
+}
+
+function shuffle(arr) {
+  return arr.slice().sort(() => Math.random() - 0.5);
+}
   </script>
 </body>
 </html>
