@@ -178,7 +178,7 @@ function runPhase1() {
 
   log(`${challengeWinner.name} wins the challenge key.`);
 
-  recordVotes(round, drawn.map(p => p.name), voteWinner.name, "Phase 1", voteWinner.name);
+recordVotes(round, drawn.map(p => ({ voter: "N/A", votee: "Unknown" })), voteWinner.name, "Phase 1");
 
   round++;
   updateTable();
