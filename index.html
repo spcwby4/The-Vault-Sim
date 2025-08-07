@@ -52,7 +52,6 @@
     <div id="juryMatrix"></div>
   </div>
 
-  <script>
 <script>
 let players = [];
 let phase = 1;
@@ -73,55 +72,59 @@ let vaults = [3, 7, 9, 11, 13, 15, 17, 19, 22];
 
 function startGame() {
   const input = document.getElementById("playerInput").value.trim().split("\n");
-  if (input.length !== 12) return alert("Enter exactly 12 players.");
+  if (input.length !== 12) {
+    alert("Please enter exactly 12 players.");
+    return;
+  }
   players = input.map(p => p.trim());
   players.forEach(p => keys[p] = []);
   generateAlliances();
   updateAlliances();
-  log(`Phase 1: Key Quest begins!`);
+  log(`Phase 1 begins: The Key Quest starts now.`);
   nextRound();
 }
 
 function nextRound() {
-  if (phase === 1) phase1();
-  else if (phase === 2) phase2();
-  else if (phase === 3) phase3();
-  else if (phase === 4) finale();
+  clearLog();
+  if (phase === 1) runPhase1();
+  else if (phase === 2) runPhase2();
+  else if (phase === 3) runPhase3();
+  else if (phase === 4) runFinale();
 }
 
-function phase1() {
-  if (Object.values(keys).filter(k => k.includes("P1")).length >= 8 || round > 4) {
+function runPhase1() {
+  if (round > 4 || Object.values(keys).filter(k => k.includes("P1")).length >= 8) {
     endPhase1();
     return;
   }
 
-  log(`Round ${round} — Drawing 4 players...`);
-  currentDraw = players.filter(p => !keys[p].includes("P1"));
-  currentDraw = shuffle(currentDraw).slice(0, 4);
-  log(`Selected: ${currentDraw.join(", ")}`);
+  let eligiblePlayers = players.filter(p => !keys[p].includes("P1"));
+  let drawn = shuffle(eligiblePlayers).slice(0, 4);
+  currentDraw = drawn;
+  log(`Round ${round} – Drawn players: ${drawn.join(", ")}`);
 
-  let found = Math.random() < 0.33;
-  if (!lockpickFound && found) {
-    lockpickHolder = currentDraw[Math.floor(Math.random() * currentDraw.length)];
+  if (!lockpickFound && Math.random() < 0.33) {
+    lockpickHolder = drawn[Math.floor(Math.random() * drawn.length)];
     lockpickFound = true;
-    log(`${lockpickHolder} found the Lockpick!`);
+    log(`${lockpickHolder} has found the Lockpick!`);
   }
 
-  let vote = simulateVote(players, currentDraw);
+  let vote = simulateVote(players, drawn);
   displayVotingMatrix(vote);
-  let [winner] = getWinnersFromVote(vote, currentDraw);
-  if (lockpickHolder && !lockpickUsed && currentDraw.includes(lockpickHolder)) {
+  let [winner, tied] = getWinnersFromVote(vote, drawn);
+
+  if (lockpickHolder && !lockpickUsed && drawn.includes(lockpickHolder)) {
     winner = lockpickHolder;
     lockpickUsed = true;
-    log(`${lockpickHolder} used the Lockpick to win the vote key!`);
-  } else {
-    log(`${winner} wins the vote key!`);
+    log(`${lockpickHolder} used the Lockpick to override the vote!`);
   }
+
+  log(`${winner} wins the vote key!`);
   keys[winner].push("P1");
 
-  let eligible = currentDraw.filter(p => p !== winner && !keys[p].includes("P1"));
-  if (eligible.length > 0) {
-    let challengeWinner = eligible[Math.floor(Math.random() * eligible.length)];
+  let challengers = drawn.filter(p => p !== winner && !keys[p].includes("P1"));
+  if (challengers.length > 0) {
+    let challengeWinner = challengers[Math.floor(Math.random() * challengers.length)];
     keys[challengeWinner].push("P1");
     log(`${challengeWinner} wins the challenge key!`);
   }
@@ -131,109 +134,148 @@ function phase1() {
 }
 
 function endPhase1() {
-  phase = 2;
+  let advancing = players.filter(p => keys[p].includes("P1"));
+  let phaseOut = players.filter(p => !advancing.includes(p));
+  eliminated = phaseOut;
+  phaseOut.forEach(p => jury.push({ name: p, phase: 1 }));
+  players = advancing;
   round = 1;
-  let survivors = players.filter(p => keys[p].includes("P1"));
-  eliminated = players.filter(p => !survivors.includes(p));
-  eliminated.forEach(j => jury.push({ name: j, phase: 1 }));
-  players = survivors;
-  log(`Phase 1 complete. Eliminated: ${eliminated.join(", ")}`);
+  phase = 2;
+  log(`Phase 1 complete. Eliminated: ${phaseOut.join(", ")}`);
   nextRound();
 }
 
-function phase2() {
+function runPhase2() {
   if (round > 4 || Object.values(keys).filter(k => k.includes("P2")).length >= 4) {
     endPhase2();
     return;
   }
 
-  log(`Phase 2 - Round ${round}`);
+  log(`Phase 2 – Round ${round}`);
   let noKey = players.filter(p => !keys[p].includes("P2"));
+  if (noKey.length < 2) {
+    log("Not enough players to run another round.");
+    endPhase2();
+    return;
+  }
+
   let vote = simulateVote(players, noKey);
   displayVotingMatrix(vote);
-
   let [winner, tied] = getWinnersFromVote(vote, noKey);
+
   if (lockpickHolder && !lockpickUsed) {
     winner = lockpickHolder;
     lockpickUsed = true;
-    log(`${lockpickHolder} used the Lockpick to override the vote and choose their duel!`);
+    log(`${lockpickHolder} used the Lockpick to override the vote!`);
   }
 
   let opponent = noKey.filter(p => p !== winner)[Math.floor(Math.random() * (noKey.length - 1))];
-  log(`${winner} faces ${opponent} in the duel.`);
+  log(`${winner} chooses to duel ${opponent}.`);
   let duelWinner = Math.random() < 0.5 ? winner : opponent;
+  log(`${duelWinner} wins the duel and earns a Phase 2 key!`);
   keys[duelWinner].push("P2");
-  log(`${duelWinner} wins the duel and earns a key!`);
+
   updateProgress();
   round++;
 }
 
 function endPhase2() {
-  phase = 3;
+  let advancing = players.filter(p => keys[p].includes("P2"));
+  let phaseOut = players.filter(p => !advancing.includes(p));
+  eliminated = phaseOut;
+  phaseOut.forEach(p => jury.push({ name: p, phase: 2 }));
+  players = advancing;
   round = 1;
-  let survivors = players.filter(p => keys[p].includes("P2"));
-  eliminated = players.filter(p => !survivors.includes(p));
-  eliminated.forEach(j => jury.push({ name: j, phase: 2 }));
-  players = survivors;
-  log(`Phase 2 complete. Eliminated: ${eliminated.join(", ")}`);
+  phase = 3;
+  log(`Phase 2 complete. Eliminated: ${phaseOut.join(", ")}`);
   nextRound();
 }
 
-function phase3() {
-  log(`Phase 3: Final Cut`);
+function runPhase3() {
+  log(`Phase 3 – Final Cut begins`);
   let vote = simulateVote(players, players);
   displayVotingMatrix(vote);
-  let [winner, tied] = getWinnersFromVote(vote, players);
-  log(`${winner} wins the vote and becomes a finalist.`);
-  let pick = players.filter(p => p !== winner)[0];
-  finalists = [winner, pick];
+  let [voteWinner, tied] = getWinnersFromVote(vote, players);
+  log(`${voteWinner} wins the final vote and becomes a finalist.`);
+
+  let available = players.filter(p => p !== voteWinner);
+  let chosenAlly = available[Math.floor(Math.random() * available.length)];
+  finalists = [voteWinner, chosenAlly];
+  log(`${voteWinner} selects ${chosenAlly} to join them.`);
+
   let remaining = players.filter(p => !finalists.includes(p));
   let duelWinner = Math.random() < 0.5 ? remaining[0] : remaining[1];
+  let duelLoser = remaining.find(p => p !== duelWinner);
   finalists.push(duelWinner);
-  let fourth = remaining.find(p => p !== duelWinner);
-  jury.push({ name: fourth, phase: 3 });
+  jury.push({ name: duelLoser, phase: 3 });
+
   phase = 4;
   updateProgress();
+  log(`${duelWinner} wins the final challenge. ${duelLoser} is eliminated.`);
   nextRound();
 }
 
-function finale() {
-  log(`Vault Finale begins!`);
+function runFinale() {
+  log(`Vault Finale – Finalists: ${finalists.join(", ")}`);
   let vaultChoices = shuffle(vaults).slice(0, 3);
   let finalistKeys = {};
   finalists.forEach(p => finalistKeys[p] = 3);
 
+  juryMatrix = {};
   jury.forEach(j => {
-    let keysToGive = j.phase === 1 ? 1 : j.phase === 2 ? 2 : 4;
-    let choices = shuffle(finalists).slice(0, Math.min(keysToGive, finalists.length));
+    let votesToGive = j.phase === 1 ? 1 : j.phase === 2 ? 2 : 4;
     juryMatrix[j.name] = {};
+    let giveTo = shuffle(finalists).slice(0, votesToGive);
     finalists.forEach(f => juryMatrix[j.name][f] = 0);
-    for (let i = 0; i < keysToGive; i++) {
-      let pick = choices[i % choices.length];
-      juryMatrix[j.name][pick]++;
-      finalistKeys[pick]++;
+    for (let i = 0; i < votesToGive; i++) {
+      let recipient = giveTo[i % giveTo.length];
+      finalistKeys[recipient]++;
+      juryMatrix[j.name][recipient]++;
     }
   });
 
   displayJuryMatrix(juryMatrix);
-  let results = finalists.map((f, i) => ({
-    name: f,
-    keys: finalistKeys[f],
+
+  let result = finalists.map((name, i) => ({
+    name,
+    keys: finalistKeys[name],
     vault: vaultChoices[i]
   }));
 
-  results.sort((a, b) => b.vault - a.vault);
-  let winner = results.find(r => r.keys >= r.vault);
-  if (!winner) winner = { name: jury.find(j => j.phase === 3).name, keys: 0, vault: 0 };
-  log(`The winner is ${winner.name}, opening a vault needing ${winner.vault} with ${winner.keys} keys!`);
+  result.sort((a, b) => b.vault - a.vault);
+  let winner = result.find(r => r.keys >= r.vault);
+  if (!winner) {
+    winner = { name: jury.find(j => j.phase === 3).name, keys: 0, vault: 0 };
+    log(`None of the finalists opened a vault. ${winner.name} wins by default!`);
+  } else {
+    log(`${winner.name} opens the ${winner.vault}-key vault with ${winner.keys} keys and wins!`);
+  }
+}
+
+function simulateVote(voters, eligible) {
+  return voters.map(v => {
+    let choices = eligible.filter(p => p !== v);
+    let choice = choices[Math.floor(Math.random() * choices.length)];
+    return [v, choice];
+  });
+}
+
+function getWinnersFromVote(votePairs, eligible) {
+  let counts = {};
+  eligible.forEach(p => counts[p] = 0);
+  votePairs.forEach(([_, votee]) => counts[votee]++);
+  let max = Math.max(...Object.values(counts));
+  let tied = Object.keys(counts).filter(p => counts[p] === max);
+  return [tied[0], tied];
 }
 
 function generateAlliances() {
-  alliances = { "Alliance A": [], "Alliance B": [], "Alliance C": [] };
-  shuffle(players).forEach((p, i) => {
-    if (i % 3 === 0) alliances["Alliance A"].push(p);
-    if (i % 3 === 1) alliances["Alliance B"].push(p);
-    if (i % 3 === 2) alliances["Alliance C"].push(p);
+  alliances = { A: [], B: [], C: [] };
+  let shuffled = shuffle(players);
+  shuffled.forEach((p, i) => {
+    if (i % 3 === 0) alliances.A.push(p);
+    else if (i % 3 === 1) alliances.B.push(p);
+    else alliances.C.push(p);
   });
 }
 
@@ -241,77 +283,66 @@ function updateAlliances() {
   const box = document.getElementById("alliancesList");
   box.innerHTML = "";
   Object.entries(alliances).forEach(([name, members]) => {
-    box.innerHTML += `<strong>${name}:</strong> ${members.join(", ")}<br/>`;
+    box.innerHTML += `<strong>Alliance ${name}</strong>: ${members.join(", ")}<br/>`;
   });
-}
-
-function simulateVote(voters, eligible) {
-  return voters.map(v => {
-    let options = eligible.filter(p => p !== v);
-    let pick = options[Math.floor(Math.random() * options.length)];
-    return [v, pick];
-  });
-}
-
-function getWinnersFromVote(votePairs, eligible) {
-  let tally = {};
-  eligible.forEach(p => tally[p] = 0);
-  votePairs.forEach(([_, vote]) => tally[vote]++);
-  let maxVotes = Math.max(...Object.values(tally));
-  let tied = Object.keys(tally).filter(p => tally[p] === maxVotes);
-  return [tied[0], tied];
-}
-
-function displayVotingMatrix(votes) {
-  let matrix = `<table><tr><th>Voter</th><th>Vote</th></tr>`;
-  votes.forEach(([voter, votee]) => {
-    matrix += `<tr><td>${voter}</td><td>${votee}</td></tr>`;
-  });
-  matrix += `</table>`;
-  document.getElementById("votingMatrix").innerHTML = matrix;
-}
-
-function displayJuryMatrix(matrix) {
-  let header = `<table><tr><th>Juror</th>`;
-  finalists.forEach(f => header += `<th>${f}</th>`);
-  header += `<th>Total</th></tr>`;
-  let rows = "";
-  for (let juror in matrix) {
-    let row = `<tr><td>${juror}</td>`;
-    let total = 0;
-    finalists.forEach(f => {
-      let val = matrix[juror][f];
-      total += val;
-      row += `<td>${val}</td>`;
-    });
-    row += `<td>${total}</td></tr>`;
-    rows += row;
-  }
-  document.getElementById("juryMatrix").innerHTML = header + rows + "</table>";
 }
 
 function updateProgress() {
-  let html = "<table><tr><th>Player</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th></tr>";
-  Object.keys(keys).forEach(p => {
+  const chart = document.getElementById("progressChart");
+  let html = `<table><tr><th>Player</th><th>P1</th><th>P2</th><th>Final</th></tr>`;
+  players.concat(eliminated).forEach(p => {
     html += `<tr><td>${p}</td>`;
-    html += `<td>${keys[p].includes("P1") ? "✔️" : ""}</td>`;
-    html += `<td>${keys[p].includes("P2") ? "✔️" : ""}</td>`;
+    html += `<td>${keys[p]?.includes("P1") ? "✔️" : ""}</td>`;
+    html += `<td>${keys[p]?.includes("P2") ? "✔️" : ""}</td>`;
     html += `<td>${finalists.includes(p) ? "✔️" : ""}</td></tr>`;
   });
-  html += "</table>";
-  document.getElementById("progressChart").innerHTML = html;
+  html += `</table>`;
+  chart.innerHTML = html;
+}
+
+function displayVotingMatrix(votes) {
+  const matrix = document.getElementById("votingMatrix");
+  let html = `<table><tr><th>Voter</th><th>Vote</th></tr>`;
+  votes.forEach(([v, vote]) => {
+    html += `<tr><td>${v}</td><td>${vote}</td></tr>`;
+  });
+  html += `</table>`;
+  matrix.innerHTML = html;
+}
+
+function displayJuryMatrix(matrix) {
+  const area = document.getElementById("juryMatrix");
+  let html = `<table><tr><th>Juror</th>`;
+  finalists.forEach(f => html += `<th>${f}</th>`);
+  html += `<th>Total</th></tr>`;
+  for (let juror in matrix) {
+    html += `<tr><td>${juror}</td>`;
+    let sum = 0;
+    finalists.forEach(f => {
+      html += `<td>${matrix[juror][f]}</td>`;
+      sum += matrix[juror][f];
+    });
+    html += `<td>${sum}</td></tr>`;
+  }
+  html += `</table>`;
+  area.innerHTML = html;
 }
 
 function log(msg) {
-  const logBox = document.getElementById("roundEvents");
-  logBox.textContent += `\n${msg}`;
-  logBox.scrollTop = logBox.scrollHeight;
+  const box = document.getElementById("roundEvents");
+  box.textContent += `\n${msg}`;
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearLog() {
+  const box = document.getElementById("roundEvents");
+  box.textContent = "";
 }
 
 function shuffle(arr) {
   return arr.slice().sort(() => Math.random() - 0.5);
 }
-  </script>
+</script>
 
 </body>
 </html>
