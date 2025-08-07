@@ -24,7 +24,8 @@
   <div class="box">
     <label for="playerInput"><strong>Enter 12 Players (one per line):</strong></label>
     <textarea id="playerInput" rows="12" placeholder="Player 1&#10;Player 2&#10;..."></textarea>
-    <button onclick="startGame()">Start Game</button>
+<button id="startBtn" onclick="startGame()">Start Game</button>
+<button id="nextBtn" onclick="nextRound()" style="display:none;">Next Round</button>
   </div>
 
   <div class="box" id="alliancesBox">
@@ -69,8 +70,12 @@ let currentDraw = [];
 let votingMatrix = [];
 let juryMatrix = {};
 let vaults = [3, 7, 9, 11, 13, 15, 17, 19, 22];
+let gameStarted = false;
 
 function startGame() {
+  if (gameStarted) return;
+  gameStarted = true;
+
   const input = document.getElementById("playerInput").value.trim().split("\n");
   if (input.length !== 12) {
     alert("Please enter exactly 12 players.");
@@ -83,6 +88,9 @@ function startGame() {
   generateAlliances();
   updateAlliances();
   log(`Phase 1 begins: The Key Quest starts now.`);
+
+  document.getElementById("startBtn").style.display = "none";
+  document.getElementById("nextBtn").style.display = "inline-block";
 
   nextRound();
 }
