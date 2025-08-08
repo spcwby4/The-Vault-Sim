@@ -491,7 +491,7 @@ function runPhase1(){
 
   // Award vote key
   keys[voteWinner].push('P1');
-  log(`${voteWinner} wins the vote key.``);
+  log(`${voteWinner} wins the vote key.`);
 
   // Challenge among remaining drawn w/out P1 — weighted by Challenge^BETA
   const challengers = drawn.filter(p=>p!==voteWinner && !keys[p].includes('P1'));
