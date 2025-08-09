@@ -1,338 +1,453 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>The Vault Simulator</title>
-  <style>
-    :root{
-      --bg:#0f1115; --panel:#1a1d24; --muted:#2a2f3a; --text:#e5e7eb; --sub:#aeb4c0;
-      --accent:#7aa2ff; --good:#6ee7b7; --warn:#fbbf24; --bad:#f87171; --border:#2b3340;
-    }
-    *{box-sizing:border-box}
-    body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);padding:20px;margin:0}
-    h1{margin:0 0 16px;text-align:center}
-    h2{margin:0 0 10px;font-size:18px;color:var(--text)}
-    textarea,button,input,select{width:100%;padding:10px;margin-top:10px;font-size:15px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
-    button{cursor:pointer} button:hover{background:var(--muted)}
-    .box{background:var(--panel);padding:15px;border-radius:12px;box-shadow:0 0 0 1px var(--border);margin-bottom:18px}
-    pre{background:var(--bg);padding:10px;border-radius:8px;height:220px;overflow-y:auto;border:1px solid var(--border);white-space:pre-wrap}
-    table{width:100%;border-collapse:collapse;margin-top:10px}
-    th,td{border:1px solid var(--border);padding:8px;text-align:center;white-space:nowrap}
-    th{background:var(--muted);position:sticky;top:0}
-    .pill{display:inline-block;min-width:20px;border-radius:6px;padding:2px 6px}
-    .ok{background:rgba(110,231,183,.15);border:1px solid rgba(110,231,183,.35)}
-    .no{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3)}
-    .table-scroll{overflow:auto;max-width:100%}
-    .stats-input{width:70px}
-    .rowwrap{display:flex;gap:18px;flex-wrap:wrap}
-    .third{flex:1 1 240px}
-    .right{max-width:520px}
-    .hint{color:var(--sub);font-size:13px;margin-top:6px}
-    .badge{display:inline-block;padding:2px 6px;border-radius:6px;background:var(--muted);font-size:12px;margin-left:6px}
-    .muted{color:var(--sub)}
-    .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:6px 8px;border-radius:8px}
-    .avatar{width:28px;height:28px;border-radius:6px;object-fit:cover;background:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
-    .grid{display:grid;gap:10px}
-    .grid-2{grid-template-columns: repeat(2, minmax(0,1fr))}
-    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:20}
-    .modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:900px;width:95%;max-height:85vh;overflow:auto;padding:16px}
-    .modal h3{margin:0 0 8px}
-    .flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px}
-    .small{font-size:12px;color:var(--sub)}
-    .btn-row{display:flex;gap:10px;flex-wrap:wrap}
-    .color{height:34px}
-    .svgwrap{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px}
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Vault Simulator</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#1a1d24; --muted:#2a2f3a; --text:#e5e7eb; --sub:#aeb4c0;
+    --accent:#7aa2ff; --good:#6ee7b7; --warn:#fbbf24; --bad:#f87171; --border:#2b3340;
+  }
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);padding:20px;margin:0}
+  h1{margin:0 0 16px;text-align:center}
+  h2{margin:0 0 10px;font-size:18px;color:var(--text)}
+  textarea,button,input,select{width:100%;padding:10px;margin-top:10px;font-size:15px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
+  button{cursor:pointer} button:hover{background:var(--muted)}
+  .box{background:var(--panel);padding:15px;border-radius:12px;box-shadow:0 0 0 1px var(--border);margin-bottom:18px}
+  pre{background:var(--bg);padding:10px;border-radius:8px;height:220px;overflow-y:auto;border:1px solid var(--border);white-space:pre-wrap}
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th,td{border:1px solid var(--border);padding:8px;text-align:center;white-space:nowrap}
+  th{background:var(--muted);position:sticky;top:0}
+  .pill{display:inline-block;min-width:20px;border-radius:6px;padding:2px 6px}
+  .ok{background:rgba(110,231,183,.15);border:1px solid rgba(110,231,183,.35)}
+  .no{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3)}
+  .table-scroll{overflow:auto;max-width:100%}
+  .stats-input{width:70px}
+  .rowwrap{display:flex;gap:18px;flex-wrap:wrap}
+  .third{flex:1 1 240px}
+  .right{max-width:520px}
+  .hint{color:var(--sub);font-size:13px;margin-top:6px}
+  .badge{display:inline-block;padding:2px 6px;border-radius:6px;background:var(--muted);font-size:12px;margin-left:6px}
+  .muted{color:var(--sub)}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:6px 8px;border-radius:8px}
+  .avatar{width:28px;height:28px;border-radius:6px;object-fit:cover;background:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+  .grid{display:grid;gap:10px}
+  .grid-2{grid-template-columns: repeat(2, minmax(0,1fr))}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:20}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:900px;width:95%;max-height:85vh;overflow:auto;padding:16px}
+  .modal h3{margin:0 0 8px}
+  .flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .small{font-size:12px;color:var(--sub)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+  .color{height:34px}
+  .svgwrap{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px}
+</style>
 </head>
 <body>
 
-  <h1>The Vault Simulator <span class="badge">Dark</span></h1>
+<h1>The Vault Simulator <span class="badge">Dark</span></h1>
 
-  <div class="box">
-    <label for="playerInput"><strong>Enter 12 Players (one per line):</strong></label>
-    <textarea id="playerInput" rows="12" placeholder="Player 1&#10;Player 2&#10;..."></textarea>
-    <button id="startBtn">Start Game</button>
-    <button id="nextBtn" style="display:none;">Next</button>
-    <div class="btn-row">
-      <button id="openEpisodes" style="display:none;">Episode Recaps</button>
-      <button id="openSeasonRecap" style="display:none;">Season Recap</button>
-      <button id="openStats" style="display:none;">Post‑Season Stats</button>
+<div class="box">
+  <label for="playerInput"><strong>Enter 12 Players (one per line):</strong></label>
+  <textarea id="playerInput" rows="12" placeholder="Player 1&#10;Player 2&#10;..."></textarea>
+  <button id="startBtn">Start Game</button>
+  <button id="nextBtn" style="display:none;">Next</button>
+  <div class="btn-row">
+    <button id="openEpisodes" style="display:none;">Episode Recaps</button>
+    <button id="openSeasonRecap" style="display:none;">Season Recap</button>
+    <button id="openStats" style="display:none;">Post‑Season Stats</button>
+  </div>
+  <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote, then duel) → Finale (Jury → Open → Winner). Final 4: 2‑way tie = tied duel; 4‑way tie = top‑3 challenge.</div>
+</div>
+
+<div class="box" id="alliancesBox">
+  <h2>Alliances</h2>
+  <div id="alliancesList"></div>
+</div>
+
+<div class="rowwrap">
+  <div class="box third" id="statsBox">
+    <h2>Player Stats (Preseason)</h2>
+    <div id="statsTable"></div>
+    <div class="rowwrap">
+      <button id="presetBalanced" class="third">Balanced</button>
+      <button id="presetSocial" class="third">Social‑heavy</button>
+      <button id="presetChallenge" class="third">Challenge‑heavy</button>
+      <button id="presetRandom" class="third">Randomize All</button>
     </div>
-    <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote, then duel) → Finale (Jury → Open → Winner). F4: 2‑way tie = tied duel; 4‑way tie = top‑3 challenge.</div>
+    <button id="applyStats">Apply Stats</button>
+    <div class="hint">Range: 1–15. Defaults to 8/8. Hidden in-game.</div>
   </div>
 
-  <!-- Alliances panel (added back) -->
-  <div class="box" id="alliancesBox">
-    <h2>Alliances</h2>
-    <div id="alliancesList"></div>
-  </div>
-
-  <div class="rowwrap">
-    <div class="box third" id="statsBox">
-      <h2>Player Stats (Preseason)</h2>
-      <div id="statsTable"></div>
-      <div class="rowwrap">
-        <button id="presetBalanced" class="third">Balanced</button>
-        <button id="presetSocial" class="third">Social‑heavy</button>
-        <button id="presetChallenge" class="third">Challenge‑heavy</button>
-        <button id="presetRandom" class="third">Randomize All</button>
-      </div>
-      <button id="applyStats">Apply Stats</button>
-      <div class="hint">Range: 1–15. Defaults to 8/8. Stats lock after you click Start Game.</div>
+  <div class="box third" id="relsPreBox">
+    <h2>Relationships (Preseason)</h2>
+    <div class="hint">Pick a focus player, then set their relationship to each other player (−5..+5).</div>
+    <div class="rowwrap" style="align-items:center">
+      <label class="muted">Focus Player</label>
+      <select id="relFocus"></select>
     </div>
-
-    <div class="box third" id="relsPreBox">
-      <h2>Relationships (Preseason)</h2>
-      <div class="hint">Pick a focus player, then set their relationship with everyone else (−5..+5).</div>
-      <div class="rowwrap" style="align-items:center">
-        <label class="muted">Focus Player</label>
-        <select id="relFocus"></select>
-      </div>
-      <div id="relEditor"></div>
-      <div class="rowwrap" style="margin-top:8px">
-        <button id="relSave" class="third">Save (All Players)</button>
-        <button id="relRandFocus" class="third">Randomize Mild (Focus)</button>
-        <button id="relClearFocus" class="third">Clear (Focus)</button>
-      </div>
-      <div class="rowwrap" style="margin-top:8px">
-        <button id="relRandAll" class="third">Randomize Mild (All)</button>
-        <button id="relClearAll" class="third">Clear (All)</button>
-      </div>
+    <div id="relEditor"></div>
+    <div class="rowwrap" style="margin-top:8px">
+      <button id="relSave" class="third">Save (All Players)</button>
+      <button id="relRandFocus" class="third">Randomize Mild (Focus)</button>
+      <button id="relClearFocus" class="third">Clear (Focus)</button>
     </div>
-
-    <div class="box third right" id="castBox">
-      <h2>Cast Photos & Colors (Optional)</h2>
-      <div id="castGrid"></div>
-      <div class="hint">Paste image URLs. Leave blank to use initials. Colors show on recaps & stats.</div>
+    <div class="rowwrap" style="margin-top:8px">
+      <button id="relRandAll" class="third">Randomize Mild (All)</button>
+      <button id="relClearAll" class="third">Clear (All)</button>
     </div>
   </div>
 
-  <div class="box">
-    <h2>Round Events</h2>
-    <pre id="roundEvents"></pre>
+  <div class="box third right" id="castBox">
+    <h2>Cast Photos & Colors (Optional)</h2>
+    <div id="castGrid"></div>
+    <div class="hint">Paste image URLs or leave blank for initials. Colors show in tables/modals.</div>
   </div>
+</div>
 
-  <div class="box">
-    <h2>Progress Chart</h2>
-    <div id="progressChart"></div>
-  </div>
+<div class="box">
+  <h2>Round Events</h2>
+  <pre id="roundEvents"></pre>
+</div>
 
-  <div class="box">
-    <h2>Voting Matrix (Season)</h2>
-    <div id="votingMatrix"></div>
-    <div class="hint">LOCKPICK shows in the voter’s cell if used. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
-  </div>
+<div class="box">
+  <h2>Progress Chart</h2>
+  <div id="progressChart"></div>
+</div>
 
-  <div class="box">
-    <h2>Relationships (Live)</h2>
-    <div id="relsLive"></div>
-  </div>
+<div class="box">
+  <h2>Voting Matrix (Season)</h2>
+  <div id="votingMatrix"></div>
+  <div class="hint">LOCKPICK appears in the voter’s cell if used. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
+</div>
 
-  <div class="box">
-    <h2>Jury Key Distribution</h2>
-    <div id="juryMatrix"></div>
-  </div>
+<div class="box">
+  <h2>Relationships (Live)</h2>
+  <div id="relsLive"></div>
+</div>
 
-  <!-- Episode / Season / Stats modals -->
-  <div class="modal-bg" id="episodesModal"><div class="modal">
-    <div class="flex-between"><h3>Episode Recaps</h3>
-      <div class="btn-row"><button id="prevEp">◀</button><span id="epTitle" class="small"></span><button id="nextEp">▶</button><button onclick="closeModal('episodesModal')">Close</button></div>
-    </div><div id="epContent"></div></div></div>
+<div class="box">
+  <h2>Jury Key Distribution</h2>
+  <div id="juryMatrix"></div>
+</div>
 
-  <div class="modal-bg" id="seasonModal"><div class="modal">
-    <div class="flex-between"><h3>Season Recap</h3><button onclick="closeModal('seasonModal')">Close</button></div>
-    <div id="seasonContent"></div></div></div>
+<!-- Modals -->
+<div class="modal-bg" id="episodesModal"><div class="modal">
+  <div class="flex-between"><h3>Episode Recaps</h3>
+    <div class="btn-row"><button id="prevEp">◀</button><span id="epTitle" class="small"></span><button id="nextEp">▶</button><button onclick="closeModal('episodesModal')">Close</button></div>
+  </div><div id="epContent"></div></div></div>
 
-  <div class="modal-bg" id="statsModal"><div class="modal">
-    <div class="flex-between"><h3>Post‑Season Stats</h3><button onclick="closeModal('statsModal')">Close</button></div>
-    <div id="statsContent"></div></div></div>
+<div class="modal-bg" id="seasonModal"><div class="modal">
+  <div class="flex-between"><h3>Season Recap</h3><button onclick="closeModal('seasonModal')">Close</button></div>
+  <div id="seasonContent"></div></div></div>
+
+<div class="modal-bg" id="statsModal"><div class="modal">
+  <div class="flex-between"><h3>Post‑Season Stats</h3><button onclick="closeModal('statsModal')">Close</button></div>
+  <div id="statsContent"></div></div></div>
 
 <script>
-/* ====== Tunables ====== */
-const ALPHA_SOCIAL=0.65,BETA_CHALLENGE=1.0,GAMMA_BEATABLE=1.2;
-const LOGIT_K=0.7,WIN_CLAMP_LO=0.15,WIN_CLAMP_HI=0.85;
-const VOTE_JITTER_MIN=0.8,VOTE_JITTER_MAX=1.2,ALLY_PREFERENCE_RATE=0.6;
-const REL_SCALE=0.08,REL_MIN_FACTOR=0.3;
+/* ===== Tunables (kept simple) ===== */
+var ALPHA_SOCIAL=0.65, BETA_CHALLENGE=1.0, GAMMA_BEATABLE=1.2;
+var LOGIT_K=0.7, WIN_CLAMP_LO=0.15, WIN_CLAMP_HI=0.85;
+var VOTE_JITTER_MIN=0.8, VOTE_JITTER_MAX=1.2, ALLY_PREFERENCE_RATE=0.6;
+var REL_SCALE=0.08, REL_MIN_FACTOR=0.3;
 
-/* ====== State ====== */
-let players=[], initialOrder=[], phase=1, round=1;
-let alliances={}, keys={}, jury=[], finalists=[], eliminated=[];
-let lockpickHolder=null, lockpickUsed=false, lockpickFound=false;
-let voteColumns=[], knownVoters=[], vaults=Array.from({length:20},(_,i)=>i+3);
-let gameStarted=false, phase3Step=0;
-let finaleStep=0, finaleState={ finalistKeys:null,chosenVaults:null,juryMatrix:null,resultList:null,winner:null };
-let stats={}, rel={}, relUpdateQueue=[];
-let episodes=[], currentScenes=[], epIndex=-1;
-let cast={};
-let duelWins={}, duelLosses={}, keysEarned={}, votesGiven={}, votesReceived={}, juryKeysReceived={};
-let relTimeline=[];
+/* ===== State ===== */
+var players=[], initialOrder=[], phase=1, round=1;
+var alliances={}, keys={}, jury=[], finalists=[], eliminated=[];
+var lockpickHolder=null, lockpickUsed=false, lockpickFound=false;
+var voteColumns=[], knownVoters=[], vaults=[];
+for(var i=3;i<=22;i++) vaults.push(i);
+var gameStarted=false, phase3Step=0;
 
-/* ====== DOM ====== */
-const startBtn=document.getElementById('startBtn'), nextBtn=document.getElementById('nextBtn');
-const roundsBox=document.getElementById('roundEvents'), statsBox=document.getElementById('statsBox');
-const relsPreBox=document.getElementById('relsPreBox'), statsTableDiv=document.getElementById('statsTable');
-const castGridDiv=document.getElementById('castGrid');
+var finaleStep=0, finaleState={ finalistKeys:null, chosenVaults:null, juryMatrix:null, resultList:null, winner:null };
 
-document.getElementById('openEpisodes').onclick=()=>openModal('episodesModal');
-document.getElementById('openSeasonRecap').onclick=()=>openSeasonModal();
-document.getElementById('openStats').onclick=()=>openStatsModal();
-document.getElementById('prevEp').onclick=()=>{ setEpIndex(epIndex-1) };
-document.getElementById('nextEp').onclick=()=>{ setEpIndex(epIndex+1) };
+var stats={}, rel={}, relUpdateQueue=[];
+var episodes=[], currentScenes=[], epIndex=-1;
+var cast={};
+var duelWins={}, duelLosses={}, keysEarned={}, votesGiven={}, votesReceived={}, juryKeysReceived={};
+var relTimeline=[];
+
+/* ===== DOM ===== */
+var startBtn=document.getElementById('startBtn'), nextBtn=document.getElementById('nextBtn');
+var roundsBox=document.getElementById('roundEvents'), statsBox=document.getElementById('statsBox');
+var relsPreBox=document.getElementById('relsPreBox'), statsTableDiv=document.getElementById('statsTable');
+var castGridDiv=document.getElementById('castGrid');
+
+document.getElementById('openEpisodes').onclick=function(){openModal('episodesModal')};
+document.getElementById('openSeasonRecap').onclick=function(){openSeasonModal()};
+document.getElementById('openStats').onclick=function(){openStatsModal()};
+document.getElementById('prevEp').onclick=function(){ setEpIndex(epIndex-1) };
+document.getElementById('nextEp').onclick=function(){ setEpIndex(epIndex+1) };
 
 startBtn.onclick=startGame; nextBtn.onclick=nextRound;
 
-/* ====== Logging + episodes ====== */
+/* ===== Log & Episodes ===== */
 function log(msg){ roundsBox.textContent += (roundsBox.textContent?'\n':'') + msg; roundsBox.scrollTop=roundsBox.scrollHeight; pushSceneLine('Events', msg); }
-function clearLog(){ roundsBox.textContent='' }
-function queueRelUpdate(msg){ relUpdateQueue.push(msg) }
-function flushRelUpdates(label='Relationship updates'){
+function clearLog(){ roundsBox.textContent=''; }
+function queueRelUpdate(msg){ relUpdateQueue.push(msg); }
+function flushRelUpdates(label){
   if(!relUpdateQueue.length) return;
-  log('— '+label+' —'); relUpdateQueue.forEach(line=>{ roundsBox.textContent+='\n'+line; });
-  roundsBox.scrollTop=roundsBox.scrollHeight; pushSceneLines(label, relUpdateQueue.slice()); relUpdateQueue=[];
+  var title = label || 'Relationship updates';
+  log('— '+title+' —');
+  for(var i=0;i<relUpdateQueue.length;i++){ roundsBox.textContent+='\n'+relUpdateQueue[i]; }
+  roundsBox.scrollTop=roundsBox.scrollHeight;
+  pushSceneLines(title, relUpdateQueue.slice());
+  relUpdateQueue=[];
 }
-function newEpisode(title){ currentScenes=[]; episodes.push({title,scenes:currentScenes,snap:seasonSnapshot()}); epIndex=episodes.length-1; renderEpisodesButton(); }
-function pushScene(label){ currentScenes.push({label,lines:[]}) }
-function pushSceneLine(label,line){ let s=currentScenes.find(x=>x.label===label); if(!s){s={label,lines:[]}; currentScenes.push(s);} s.lines.push(line); }
-function pushSceneLines(label,lines){ let s=currentScenes.find(x=>x.label===label); if(!s){s={label,lines:[]}; currentScenes.push(s);} s.lines.push(...lines); }
-function seasonSnapshot(){ return { players:players.slice(), finalists:finalists.slice(), eliminated:eliminated.slice(), jury: jury.map(j=>({...j})), alliances: JSON.parse(JSON.stringify(alliances)), keys: JSON.parse(JSON.stringify(keys)) }; }
+function newEpisode(title){ currentScenes=[]; episodes.push({title:title,scenes:currentScenes,snap:seasonSnapshot()}); epIndex=episodes.length-1; renderEpisodesButton(); }
+function pushScene(label){ currentScenes.push({label:label,lines:[]}); }
+function pushSceneLine(label,line){ var s=null; for(var i=0;i<currentScenes.length;i++){ if(currentScenes[i].label===label){ s=currentScenes[i]; break; } } if(!s){ s={label:label,lines:[]}; currentScenes.push(s); } s.lines.push(line); }
+function pushSceneLines(label,lines){ var s=null; for(var i=0;i<currentScenes.length;i++){ if(currentScenes[i].label===label){ s=currentScenes[i]; break; } } if(!s){ s={label:label,lines:[]}; currentScenes.push(s); } Array.prototype.push.apply(s.lines, lines); }
+function seasonSnapshot(){ return { players:players.slice(), finalists:finalists.slice(), eliminated:eliminated.slice(), jury: jury.map(function(j){return {name:j.name,phase:j.phase}}), alliances: JSON.parse(JSON.stringify(alliances)), keys: JSON.parse(JSON.stringify(keys)) }; }
 
-/* ====== Utils ====== */
-function shuffle(a){ return a.slice().sort(()=>Math.random()-0.5) }
-function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)) }
-function inAlliance(a,b){ return Object.values(alliances).some(list=>list.includes(a)&&list.includes(b)) }
-function getElimPhase(n){ const j=jury.find(x=>x.name===n); return j? j.phase:null }
-function initials(name){ return (name.split(/\s+/).map(w=>w[0]).join('').slice(0,2)||'?').toUpperCase() }
+/* ===== Utils ===== */
+function shuffle(a){ return a.slice().sort(function(){return Math.random()-0.5}); }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+function inAlliance(a,b){ var lists=Object.values(alliances); for(var i=0;i<lists.length;i++){ var L=lists[i]; if(L.indexOf(a)!==-1 && L.indexOf(b)!==-1) return true; } return false; }
+function getElimPhase(n){ for(var i=0;i<jury.length;i++){ if(jury[i].name===n) return jury[i].phase; } return null; }
+function initials(name){ var parts=name.split(/\s+/), t=''; for(var i=0;i<parts.length;i++){ if(parts[i]) t+=parts[i][0]; } return (t||'?').slice(0,2).toUpperCase(); }
 
-function setRel(a,b,val){ (rel[a]??={})[b]=val; (rel[b]??={})[a]=val; }
-function getRel(a,b){ return (rel[a]&&rel[a][b]!==undefined)? rel[a][b]:0 }
-function incRel(a,b,delta){ const v=clamp(getRel(a,b)+delta,-5,5); setRel(a,b,v); if(delta>0) queueRelUpdate(`${a} and ${b} strengthen their bond (+${delta} → ${v}).`); else if(delta<0) queueRelUpdate(`${a} and ${b} get into a fight (${delta} → ${v}).`); renderRelsLive(); }
+function setRel(a,b,val){ if(!rel[a]) rel[a]={}; if(!rel[b]) rel[b]={}; rel[a][b]=val; rel[b][a]=val; }
+function getRel(a,b){ return (rel[a] && typeof rel[a][b]!=='undefined') ? rel[a][b] : 0; }
+function incRel(a,b,delta){ var v=clamp(getRel(a,b)+delta,-5,5); setRel(a,b,v); if(delta>0) queueRelUpdate(a+' and '+b+' strengthen their bond (+'+delta+' → '+v+').'); else if(delta<0) queueRelUpdate(a+' and '+b+' get into a fight ('+delta+' → '+v+').'); renderRelsLive(); }
 
-function weightedChoice(items, wArg){ let w=typeof wArg==='function'? items.map(x=>Math.max(0.0001,wArg(x))):(wArg||[]).slice(); if(w.length!==items.length) w=items.map(_=>1); const s=w.reduce((a,b)=>a+b,0); let r=Math.random()*s; for(let i=0;i<items.length;i++){ r-=w[i]; if(r<=0) return items[i]; } return items[items.length-1] }
-function duelWinProb(a,b){ const da=stats[a]?.challenge??8, db=stats[b]?.challenge??8; const p=1/(1+Math.exp(-LOGIT_K*(da-db))); return clamp(p,WIN_CLAMP_LO,WIN_CLAMP_HI) }
-function relFactor(voter,target){ const rf=1+REL_SCALE*getRel(voter,target); return clamp(rf,REL_MIN_FACTOR,2) }
+function weightedChoice(items, weightsOrFn){
+  var w=[], i;
+  if(typeof weightsOrFn==='function'){ for(i=0;i<items.length;i++){ var val=Math.max(0.0001, weightsOrFn(items[i])); w.push(val); } }
+  else if(Array.isArray(weightsOrFn)){ w=weightsOrFn.slice(); }
+  else { for(i=0;i<items.length;i++) w.push(1); }
+  if(w.length!==items.length) { w=[]; for(i=0;i<items.length;i++) w.push(1); }
+  var sum=0; for(i=0;i<w.length;i++) sum+=w[i];
+  var r=Math.random()*sum;
+  for(i=0;i<items.length;i++){ r-=w[i]; if(r<=0) return items[i]; }
+  return items[items.length-1];
+}
+function duelWinProb(a,b){
+  var da=(stats[a]?stats[a].challenge:8), db=(stats[b]?stats[b].challenge:8);
+  var p=1/(1+Math.exp(-LOGIT_K*(da-db)));
+  return clamp(p,WIN_CLAMP_LO,WIN_CLAMP_HI);
+}
+function relFactor(voter,target){ var rf=1+REL_SCALE*getRel(voter,target); return clamp(rf,REL_MIN_FACTOR,2); }
 
-/* ====== Preseason: Stats / Rels / Cast ====== */
+/* ===== Preseason UIs ===== */
 document.getElementById('applyStats').onclick=applyStatsFromInputs;
-document.getElementById('presetBalanced').onclick=()=>presetStats('balanced');
-document.getElementById('presetSocial').onclick=()=>presetStats('social');
-document.getElementById('presetChallenge').onclick=()=>presetStats('challenge');
-document.getElementById('presetRandom').onclick=()=>presetStats('random');
+document.getElementById('presetBalanced').onclick=function(){presetStats('balanced')};
+document.getElementById('presetSocial').onclick=function(){presetStats('social')};
+document.getElementById('presetChallenge').onclick=function(){presetStats('challenge')};
+document.getElementById('presetRandom').onclick=function(){presetStats('random')};
 
 function buildStatsTable(){
-  const vals=getPlist();
-  let html=`<div class="table-scroll"><table><tr><th>Player</th><th>Social</th><th>Challenge</th></tr>`;
-  vals.forEach(n=>{ const s=stats[n]?.social??8, c=stats[n]?.challenge??8; html+=`<tr><td>${n}</td>
-    <td><input class="stats-input" type="number" min="1" max="15" value="${s}" data-name="${n}" data-field="social"></td>
-    <td><input class="stats-input" type="number" min="1" max="15" value="${c}" data-name="${n}" data-field="challenge"></td></tr>`; });
-  html+=`</table></div>`; statsTableDiv.innerHTML=html;
+  var vals=getPlist();
+  var html='<div class="table-scroll"><table><tr><th>Player</th><th>Social</th><th>Challenge</th></tr>';
+  for(var i=0;i<vals.length;i++){
+    var n=vals[i], s=(stats[n]?stats[n].social:8), c=(stats[n]?stats[n].challenge:8);
+    html+='<tr><td>'+n+'</td>'+
+      '<td><input class="stats-input" type="number" min="1" max="15" value="'+s+'" data-name="'+n+'" data-field="social"></td>'+
+      '<td><input class="stats-input" type="number" min="1" max="15" value="'+c+'" data-name="'+n+'" data-field="challenge"></td></tr>';
+  }
+  html+='</table></div>';
+  statsTableDiv.innerHTML=html;
 }
-function getPlist(){ const input=document.getElementById('playerInput').value.trim().split('\n').map(s=>s.trim()).filter(Boolean); return input.length? input : Object.keys(stats) }
-function applyStatsFromInputs(){ statsTableDiv.querySelectorAll('input.stats-input').forEach(inp=>{ const n=inp.dataset.name,f=inp.dataset.field,v=clamp(parseInt(inp.value||'8',10),1,15); (stats[n]??={social:8,challenge:8})[f]=v; }); log('Preseason stats applied.') }
-function presetStats(which){ const names=getPlist(); names.forEach(n=>{ stats[n]??={social:8,challenge:8}; if(which==='balanced'){stats[n].social=8;stats[n].challenge=8}
-  if(which==='social'){stats[n].social=12;stats[n].challenge=8}
-  if(which==='challenge'){stats[n].social=8;stats[n].challenge=12}
-  if(which==='random'){stats[n].social=Math.floor(1+Math.random()*15);stats[n].challenge=Math.floor(1+Math.random()*15)} }); buildStatsTable(); buildCastGrid(); }
+function getPlist(){
+  var input=document.getElementById('playerInput').value.trim().split('\n');
+  var out=[]; for(var i=0;i<input.length;i++){ var t=input[i].trim(); if(t) out.push(t); }
+  return out.length? out : Object.keys(stats);
+}
+function applyStatsFromInputs(){
+  var ins=statsTableDiv.querySelectorAll('input.stats-input');
+  for(var i=0;i<ins.length;i++){
+    var inp=ins[i], n=inp.getAttribute('data-name'), f=inp.getAttribute('data-field');
+    var v=parseInt(inp.value||'8',10); v=clamp(v,1,15);
+    if(!stats[n]) stats[n]={social:8,challenge:8};
+    stats[n][f]=v;
+  }
+  log('Preseason stats applied.');
+}
+function presetStats(which){
+  var names=getPlist();
+  for(var i=0;i<names.length;i++){
+    var n=names[i]; if(!stats[n]) stats[n]={social:8,challenge:8};
+    if(which==='balanced'){ stats[n].social=8; stats[n].challenge=8; }
+    if(which==='social'){ stats[n].social=12; stats[n].challenge=8; }
+    if(which==='challenge'){ stats[n].social=8; stats[n].challenge=12; }
+    if(which==='random'){ stats[n].social=Math.floor(1+Math.random()*15); stats[n].challenge=Math.floor(1+Math.random()*15); }
+  }
+  buildStatsTable(); buildCastGrid();
+}
 
 /* Relationships editor */
-const relFocusSel=document.getElementById('relFocus'), relEditorDiv=document.getElementById('relEditor');
+var relFocusSel=document.getElementById('relFocus'), relEditorDiv=document.getElementById('relEditor');
 document.getElementById('relSave').onclick=saveRelAllSweep;
 document.getElementById('relRandFocus').onclick=randRelFocus;
 document.getElementById('relClearFocus').onclick=clearRelFocus;
 document.getElementById('relRandAll').onclick=randRelAll;
 document.getElementById('relClearAll').onclick=clearRelAll;
 
-function buildRelFocusList(){ const names=getPlist(); relFocusSel.innerHTML=names.map(n=>`<option value="${n}">${n}</option>`).join(''); if(names.length) renderRelEditorFor(names[0]); }
-relFocusSel?.addEventListener('change', e=>renderRelEditorFor(e.target.value));
-function renderRelEditorFor(focus){
-  const names=getPlist().filter(n=>n!==focus);
-  let html=`<div class="table-scroll"><table><tr><th>Player</th><th>Score (−5..+5)</th></tr>`;
-  names.forEach(n=>{ const v=getRel(focus,n); html+=`<tr><td>${n}</td><td><input type="number" class="rel-spin" data-focus="${focus}" data-target="${n}" min="-5" max="5" step="1" value="${v}"></td></tr>`; });
-  html+=`</table></div>`; relEditorDiv.innerHTML=html;
-  relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{ inp.addEventListener('input',()=>{ const f=inp.dataset.focus,t=inp.dataset.target,val=clamp(parseInt(inp.value||'0',10),-5,5); setRel(f,t,val); renderRelsLive(); }); });
+function buildRelFocusList(){
+  var names=getPlist(), html='';
+  for(var i=0;i<names.length;i++){ html+='<option value="'+names[i]+'">'+names[i]+'</option>'; }
+  relFocusSel.innerHTML=html;
+  if(names.length) renderRelEditorFor(names[0]);
 }
-function saveRelAllSweep(){ const names=getPlist(); relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{ setRel(inp.dataset.focus,inp.dataset.target,clamp(parseInt(inp.value||'0',10),-5,5)); }); names.forEach(f=>names.filter(n=>n!==f).forEach(t=>setRel(f,t,getRel(f,t)))); log('Saved relationships for ALL players.'); renderRelsLive(); }
-function randRelFocus(){ const f=relFocusSel.value; relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{ const t=inp.dataset.target,val=Math.floor(-2+Math.random()*5); setRel(f,t,val); inp.value=val; }); log(`Randomized (mild) relationships for ${f}.`); renderRelsLive(); }
-function clearRelFocus(){ const f=relFocusSel.value; relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{ setRel(f,inp.dataset.target,0); inp.value=0; }); log(`Cleared relationships for ${f}.`); renderRelsLive(); }
-function randRelAll(){ const names=getPlist(); names.forEach(a=>names.forEach(b=>{ if(a<b){ const v=Math.floor(-2+Math.random()*5); setRel(a,b,v); } })); log('Randomized (mild) relationships for all players.'); renderRelEditorFor(relFocusSel.value); renderRelsLive(); }
-function clearRelAll(){ const names=getPlist(); names.forEach(a=>names.forEach(b=>{ if(a<b) setRel(a,b,0) })); log('Cleared all preseason relationships.'); renderRelEditorFor(relFocusSel.value); renderRelsLive(); }
+if(relFocusSel){ relFocusSel.addEventListener('change', function(e){ renderRelEditorFor(e.target.value); }); }
+
+function renderRelEditorFor(focus){
+  var names=getPlist().filter(function(n){return n!==focus});
+  var html='<div class="table-scroll"><table><tr><th>Player</th><th>Score (−5..+5)</th></tr>';
+  for(var i=0;i<names.length;i++){
+    var n=names[i], v=getRel(focus,n);
+    html+='<tr><td>'+n+'</td><td><input type="number" class="rel-spin" data-focus="'+focus+'" data-target="'+n+'" min="-5" max="5" step="1" value="'+v+'"></td></tr>';
+  }
+  html+='</table></div>';
+  relEditorDiv.innerHTML=html;
+  var spins=relEditorDiv.querySelectorAll('.rel-spin');
+  for(var j=0;j<spins.length;j++){
+    spins[j].addEventListener('input', function(){
+      var f=this.getAttribute('data-focus'), t=this.getAttribute('data-target');
+      var val=parseInt(this.value||'0',10); val=clamp(val,-5,5); setRel(f,t,val); renderRelsLive();
+    });
+  }
+}
+function saveRelAllSweep(){
+  var names=getPlist(), spins=relEditorDiv.querySelectorAll('.rel-spin'), i;
+  for(i=0;i<spins.length;i++){
+    var f=spins[i].getAttribute('data-focus'), t=spins[i].getAttribute('data-target');
+    var val=parseInt(spins[i].value||'0',10); setRel(f,t,clamp(val,-5,5));
+  }
+  // force symmetry across everyone
+  for(i=0;i<names.length;i++){
+    var f2=names[i];
+    for(var j=0;j<names.length;j++){
+      var t2=names[j]; if(f2===t2) continue;
+      setRel(f2,t2,getRel(f2,t2));
+    }
+  }
+  log('Saved relationships for ALL players.');
+  renderRelsLive();
+}
+function randRelFocus(){
+  var f=relFocusSel.value, spins=relEditorDiv.querySelectorAll('.rel-spin');
+  for(var i=0;i<spins.length;i++){
+    var t=spins[i].getAttribute('data-target'), val=Math.floor(-2+Math.random()*5);
+    setRel(f,t,val); spins[i].value=val;
+  }
+  log('Randomized (mild) relationships for '+f+'.'); renderRelsLive();
+}
+function clearRelFocus(){
+  var f=relFocusSel.value, spins=relEditorDiv.querySelectorAll('.rel-spin');
+  for(var i=0;i<spins.length;i++){ var t=spins[i].getAttribute('data-target'); setRel(f,t,0); spins[i].value=0; }
+  log('Cleared relationships for '+f+'.'); renderRelsLive();
+}
+function randRelAll(){
+  var names=getPlist();
+  for(var i=0;i<names.length;i++){
+    for(var j=i+1;j<names.length;j++){
+      var v=Math.floor(-2+Math.random()*5);
+      setRel(names[i],names[j],v);
+    }
+  }
+  log('Randomized (mild) relationships for all players.');
+  renderRelEditorFor(relFocusSel.value); renderRelsLive();
+}
+function clearRelAll(){
+  var names=getPlist();
+  for(var i=0;i<names.length;i++){
+    for(var j=i+1;j<names.length;j++){
+      setRel(names[i],names[j],0);
+    }
+  }
+  log('Cleared all preseason relationships.');
+  renderRelEditorFor(relFocusSel.value); renderRelsLive();
+}
 
 /* Cast photos & colors */
 function buildCastGrid(){
-  const names=getPlist();
+  var names=getPlist();
   if(!names.length){ castGridDiv.innerHTML=''; return; }
   if(Object.keys(cast).length===0){
-    const palette=["#7aa2ff","#ffa07a","#a3e635","#f472b6","#facc15","#34d399","#60a5fa","#f59e0b","#22d3ee","#c084fc","#fb7185","#93c5fd"];
-    names.forEach((n,i)=> cast[n]={photo:'',color:palette[i%palette.length]});
+    var palette=["#7aa2ff","#ffa07a","#a3e635","#f472b6","#facc15","#34d399","#60a5fa","#f59e0b","#22d3ee","#c084fc","#fb7185","#93c5fd"];
+    for(var i=0;i<names.length;i++){ cast[names[i]]={photo:'',color:palette[i%palette.length]}; }
   }
-  let html=`<div class="grid grid-2">`;
-  names.forEach(n=>{
-    const c=cast[n]||{photo:'',color:'#7aa2ff'};
-    html+=`<div class="chip">
-      <div class="avatar" style="background:${c.color};overflow:hidden;">${c.photo?`<img src="${c.photo}" alt="${n}" class="avatar">`:`<span>${initials(n)}</span>`}</div>
-      <div style="flex:1"><div class="small">${n}</div><input type="url" placeholder="Image URL (optional)" value="${c.photo}" data-name="${n}" class="photoUrl"></div>
-      <input type="color" class="color" value="${c.color}" data-name="${n}">
-    </div>`;
-  });
-  html+=`</div>`; castGridDiv.innerHTML=html;
-  castGridDiv.querySelectorAll('.photoUrl').forEach(inp=>{ inp.addEventListener('input',()=>{ const n=inp.dataset.name; (cast[n]??={}).photo=inp.value.trim(); buildCastGrid(); }); });
-  castGridDiv.querySelectorAll('.color').forEach(inp=>{ inp.addEventListener('input',()=>{ const n=inp.dataset.name; (cast[n]??={}).color=inp.value; buildCastGrid(); }); });
+  var html='<div class="grid grid-2">';
+  for(var j=0;j<names.length;j++){
+    var n=names[j], c=cast[n]||{photo:'',color:'#7aa2ff'};
+    html+='<div class="chip">'+
+      '<div class="avatar" style="background:'+c.color+';overflow:hidden;">'+(c.photo?'<img src="'+c.photo+'" class="avatar" alt="'+n+'">':'<span>'+initials(n)+'</span>')+'</div>'+
+      '<div style="flex:1"><div class="small">'+n+'</div><input type="url" placeholder="Image URL (optional)" value="'+c.photo+'" data-name="'+n+'" class="photoUrl"></div>'+
+      '<input type="color" class="color" value="'+c.color+'" data-name="'+n+'">'+
+    '</div>';
+  }
+  html+='</div>';
+  castGridDiv.innerHTML=html;
+  var urls=castGridDiv.querySelectorAll('.photoUrl'), cols=castGridDiv.querySelectorAll('.color');
+  for(var k=0;k<urls.length;k++){
+    urls[k].addEventListener('input', function(){ var n=this.getAttribute('data-name'); if(!cast[n]) cast[n]={photo:'',color:'#7aa2ff'}; cast[n].photo=this.value.trim(); buildCastGrid(); });
+  }
+  for(var m=0;m<cols.length;m++){
+    cols[m].addEventListener('input', function(){ var n=this.getAttribute('data-name'); if(!cast[n]) cast[n]={photo:'',color:'#7aa2ff'}; cast[n].color=this.value; buildCastGrid(); });
+  }
 }
 
-/* Live Relationships view */
+/* Live relationships view */
 function renderRelsLive(){
-  const wrap=document.getElementById('relsLive');
-  const names=players.length? players : getPlist();
+  var wrap=document.getElementById('relsLive');
+  var names=players.length? players : getPlist();
   if(!names.length){ wrap.innerHTML=''; return; }
-  const pairs=[], seen=new Set();
-  names.forEach(a=>names.forEach(b=>{ if(a===b) return; const k=[a,b].sort().join('|'); if(seen.has(k)) return; seen.add(k); pairs.push({a,b,v:getRel(a,b)}); }));
-  pairs.sort((x,y)=>Math.abs(y.v)-Math.abs(x.v));
-  const bonds=pairs.filter(p=>p.v>0).slice(0,6), feuds=pairs.filter(p=>p.v<0).slice(0,6);
-  wrap.innerHTML=`<div class="rowwrap"><div class="third"><strong>Top Bonds</strong><br/>${bonds.length?bonds.map(p=>`${p.a} ↔ ${p.b} (+${p.v})`).join('<br/>'):'<span class="muted">None yet</span>'}</div><div class="third"><strong>Top Rivalries</strong><br/>${feuds.length?feuds.map(p=>`${p.a} ↔ ${p.b} (${p.v})`).join('<br/>'):'<span class="muted">None yet</span>'}</div></div>`;
+  var pairs=[], seen={};
+  for(var i=0;i<names.length;i++){
+    for(var j=0;j<names.length;j++){
+      var a=names[i], b=names[j]; if(a===b) continue;
+      var key=[a,b].sort().join('|');
+      if(seen[key]) continue; seen[key]=1;
+      pairs.push({a:a,b:b,v:getRel(a,b)});
+    }
+  }
+  pairs.sort(function(x,y){ return Math.abs(y.v)-Math.abs(x.v); });
+  var bonds=pairs.filter(function(p){return p.v>0}).slice(0,6);
+  var feuds=pairs.filter(function(p){return p.v<0}).slice(0,6);
+  wrap.innerHTML='<div class="rowwrap"><div class="third"><strong>Top Bonds</strong><br/>'+(bonds.length?bonds.map(function(p){return p.a+' ↔ '+p.b+' (+'+p.v+')'}).join('<br/>'):'<span class="muted">None yet</span>')+'</div>'+
+    '<div class="third"><strong>Top Rivalries</strong><br/>'+(feuds.length?feuds.map(function(p){return p.a+' ↔ '+p.b+' ('+p.v+')'}).join('<br/>'):'<span class="muted">None yet</span>')+'</div></div>';
 }
 
 /* Sync preseason UIs with typed names */
-document.getElementById('playerInput').addEventListener('input',()=>{ if(!gameStarted){ buildStatsTable(); buildRelFocusList(); buildCastGrid(); renderRelsLive(); }});
+document.getElementById('playerInput').addEventListener('input', function(){ if(!gameStarted){ buildStatsTable(); buildRelFocusList(); buildCastGrid(); renderRelsLive(); }});
 buildStatsTable(); buildRelFocusList(); buildCastGrid();
 
-/* ====== Start / Next / Reset (guarded) ====== */
+/* ===== Start / Next (guarded) ===== */
 function startGame(){
   if(gameStarted) return;
-
-  const input=document.getElementById('playerInput').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
-  if(input.length!==12){ alert('Please enter exactly 12 players.'); return; }
+  var input=document.getElementById('playerInput').value.trim().split('\n'), i, t, list=[];
+  for(i=0;i<input.length;i++){ t=input[i].trim(); if(t) list.push(t); }
+  if(list.length!==12){ alert('Please enter exactly 12 players.'); return; }
 
   try{
     gameStarted=true;
 
-    players=input; initialOrder=input.slice(); knownVoters=input.slice();
-    players.forEach(p=>{
-      keys[p]=[];
-      stats[p]??={social:8,challenge:8};
-      rel[p]??={};
-      duelWins[p]=0; duelLosses[p]=0;
-      keysEarned[p]={P1:0,P2:0};
-      votesGiven[p]=0; votesReceived[p]=0;
-      juryKeysReceived[p]=0;
-      cast[p]??={photo:'',color:'#7aa2ff'};
-    });
+    players=list.slice(); initialOrder=list.slice(); knownVoters=list.slice();
+    for(i=0;i<players.length;i++){
+      var p=players[i]; keys[p]=[]; if(!stats[p]) stats[p]={social:8,challenge:8}; if(!rel[p]) rel[p]={};
+      duelWins[p]=0; duelLosses[p]=0; keysEarned[p]={P1:0,P2:0}; votesGiven[p]=0; votesReceived[p]=0; juryKeysReceived[p]=0;
+      if(!cast[p]) cast[p]={photo:'',color:'#7aa2ff'};
+    }
 
     // lock preseason panels
     statsBox.style.display='none'; relsPreBox.style.display='none'; document.getElementById('castBox').style.display='none';
 
-    // Immediate visible log so you know we started
-    newEpisode(`Episode 1 (Phase 1 R1)`); pushScene('Events'); log('Phase 1 begins: The Key Quest starts now.');
+    // immediate episode/log so you see movement even if something later errors
+    newEpisode('Episode 1 (Phase 1 R1)'); pushScene('Events'); log('Phase 1 begins: The Key Quest starts now.');
 
     generateAlliances(); updateAlliances(); updateProgress(); renderMasterVoteTable(); renderRelsLive();
 
     startBtn.style.display='none'; nextBtn.style.display='inline-block'; nextBtn.textContent='Next'; nextBtn.onclick=nextRound;
     document.getElementById('openEpisodes').style.display='inline-block';
 
-    // Kick off Round 1
     nextRound();
 
   }catch(err){
-    log(`[Error during Start Game] ${err && err.message ? err.message : err}`);
+    log('[Error during Start Game] '+(err && err.message? err.message : err));
     console.error(err);
     gameStarted=false;
     statsBox.style.display=''; relsPreBox.style.display=''; document.getElementById('castBox').style.display='';
@@ -348,105 +463,229 @@ function nextRound(){
     else if(phase===4) runFinale();
     renderEpisodesButton();
   }catch(err){
-    log(`[Error during Next] ${err && err.message ? err.message : err}`);
+    log('[Error during Next] '+(err && err.message? err.message : err));
     console.error(err);
   }
 }
 
-function endGameUI(){ nextBtn.textContent='Simulate Again'; nextBtn.onclick=()=>location.reload(); document.getElementById('openSeasonRecap').style.display='inline-block'; document.getElementById('openStats').style.display='inline-block'; }
-
-/* ====== Voting Core ====== */
-function simulateVote(voters, eligible){
-  return voters.map(v=>{
-    const choices=eligible.filter(p=>p!==v);
-    const ally=choices.filter(c=>inAlliance(v,c));
-    const prioritize = ally.length>0 && Math.random()<ALLY_PREFERENCE_RATE;
-    const pool = prioritize? ally : choices;
-    const baseAlpha = prioritize? ALPHA_SOCIAL : 0.5*ALPHA_SOCIAL;
-    const weights = pool.map(c=>{ const s=stats[c]?.social??8; const j=VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN); const rf=relFactor(v,c); return Math.pow(s,baseAlpha)*j*rf; });
-    const pick=weightedChoice(pool,weights); votesGiven[v]++; votesReceived[pick]++; return [v,pick];
-  });
+function endGameUI(){
+  nextBtn.textContent='Simulate Again';
+  nextBtn.onclick=function(){ location.reload(); };
+  document.getElementById('openSeasonRecap').style.display='inline-block';
+  document.getElementById('openStats').style.display='inline-block';
 }
-function tally(votePairs, eligible){ const counts={}; eligible.forEach(p=>counts[p]=0); votePairs.forEach(([_,to])=>{ if(counts.hasOwnProperty(to)) counts[to]++ }); const max=Math.max(...Object.values(counts)); const tied=Object.keys(counts).filter(p=>counts[p]===max); return [tied[0],tied,counts]; }
-function addVoteColumn(label,phaseTag,roundNo,voters,votePairs,result,lockUser=null){ const values={}; knownVoters.forEach(v=>values[v]='—'); votePairs.forEach(([v,to])=>{ values[v]=to }); if(lockUser){ values[lockUser]='LOCKPICK' } voteColumns.push({label,phaseTag,roundNo,result,values}); renderMasterVoteTable(); }
+
+/* ===== Voting Core ===== */
+function simulateVote(voters, eligible){
+  var out=[];
+  for(var i=0;i<voters.length;i++){
+    var v=voters[i];
+    var choices=eligible.filter(function(p){return p!==v});
+    var al=choices.filter(function(c){return inAlliance(v,c)});
+    var prioritize = al.length>0 && Math.random()<ALLY_PREFERENCE_RATE;
+    var pool = prioritize? al : choices;
+    var baseAlpha = prioritize? ALPHA_SOCIAL : 0.5*ALPHA_SOCIAL;
+    var weights = pool.map(function(c){
+      var s=(stats[c]?stats[c].social:8);
+      var j=VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN);
+      var rf=relFactor(v,c);
+      return Math.pow(s,baseAlpha)*j*rf;
+    });
+    var pick=weightedChoice(pool,weights);
+    votesGiven[v]++; votesReceived[pick]++;
+    out.push([v,pick]);
+  }
+  return out;
+}
+function tally(votePairs, eligible){
+  var counts={}, i; for(i=0;i<eligible.length;i++) counts[eligible[i]]=0;
+  for(i=0;i<votePairs.length;i++){ var to=votePairs[i][1]; if(counts.hasOwnProperty(to)) counts[to]++; }
+  var max=-Infinity, k; for(k in counts){ if(counts[k]>max) max=counts[k]; }
+  var tied=[]; for(k in counts){ if(counts[k]===max) tied.push(k); }
+  return [tied[0], tied, counts];
+}
+function addVoteColumn(label,phaseTag,roundNo,voters,votePairs,result,lockUser){
+  var values={}, i; for(i=0;i<knownVoters.length;i++) values[knownVoters[i]]='—';
+  for(i=0;i<votePairs.length;i++){ var v=votePairs[i][0], to=votePairs[i][1]; values[v]=to; }
+  if(lockUser) values[lockUser]='LOCKPICK';
+  voteColumns.push({label:label,phaseTag:phaseTag,roundNo:roundNo,result:result,values:values});
+  renderMasterVoteTable();
+}
 function renderMasterVoteTable(){
-  const wrap=document.getElementById('votingMatrix');
-  let html=`<div class="table-scroll"><table><thead><tr><th>Voter</th>`;
-  voteColumns.forEach(c=>{ html+=`<th>${c.label}</th>`; }); html+=`</tr></thead><tbody>`;
-  const active=players.slice(), p3=eliminated.filter(n=>getElimPhase(n)===3), p2=eliminated.filter(n=>getElimPhase(n)===2), p1=eliminated.filter(n=>getElimPhase(n)===1);
-  function row(name){ html+=`<tr><td>${name}</td>`; voteColumns.forEach(c=>{ html+=`<td>${c.values[name]??'—'}</td>`; }); html+=`</tr>`; }
-  active.forEach(row); p3.forEach(row); p2.forEach(row); p1.forEach(row);
-  html+=`<tr><th>Result</th>`; voteColumns.forEach(c=>{ html+=`<th>${c.result||''}</th>`; }); html+=`</tr></tbody></table></div>`;
+  var wrap=document.getElementById('votingMatrix');
+  var html='<div class="table-scroll"><table><thead><tr><th>Voter</th>';
+  for(var i=0;i<voteColumns.length;i++){ html+='<th>'+voteColumns[i].label+'</th>'; }
+  html+='</tr></thead><tbody>';
+  var active=players.slice();
+  var p3=eliminated.filter(function(n){return getElimPhase(n)===3});
+  var p2=eliminated.filter(function(n){return getElimPhase(n)===2});
+  var p1=eliminated.filter(function(n){return getElimPhase(n)===1});
+  function row(name){
+    html+='<tr><td>'+name+'</td>';
+    for(var c=0;c<voteColumns.length;c++){ html+='<td>'+(voteColumns[c].values[name]||'—')+'</td>'; }
+    html+='</tr>';
+  }
+  for(i=0;i<active.length;i++) row(active[i]);
+  for(i=0;i<p3.length;i++) row(p3[i]);
+  for(i=0;i<p2.length;i++) row(p2[i]);
+  for(i=0;i<p1.length;i++) row(p1[i]);
+  html+='<tr><th>Result</th>';
+  for(i=0;i<voteColumns.length;i++){ html+='<th>'+(voteColumns[i].result||'')+'</th>'; }
+  html+='</tr></tbody></table></div>';
   wrap.innerHTML=html;
 }
 
-/* ====== Alliances (fluid) ====== */
+/* ===== Alliances (fluid) ===== */
 function generateAlliances(){
   alliances={};
-  const count=Math.floor(Math.random()*3)+2; // 2..4
-  // safer: split → slice
-  const names='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').slice(0,count);
-  const sh=shuffle(players);
-  names.forEach(n=>alliances[n]=[]);
-  sh.forEach((p,i)=> alliances[names[i%count]].push(p));
-  players.forEach(p=>{ if(Math.random()<0.15){ const other=names[Math.floor(Math.random()*names.length)]; if(!alliances[other].includes(p)) alliances[other].push(p); } });
+  var count=Math.floor(Math.random()*3)+2; // 2..4
+  var names='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').slice(0,count);
+  var sh=shuffle(players);
+  for(var i=0;i<names.length;i++) alliances[names[i]]=[];
+  for(i=0;i<sh.length;i++){ alliances[names[i%count]].push(sh[i]); }
+  for(i=0;i<players.length;i++){
+    var p=players[i];
+    if(Math.random()<0.15){
+      var other=names[Math.floor(Math.random()*names.length)];
+      if(alliances[other].indexOf(p)===-1) alliances[other].push(p);
+    }
+  }
 }
-function averageRelWithAlliance(p,A){ const m=alliances[A].filter(x=>x!==p); if(!m.length) return 0; return m.reduce((a,b)=>a+getRel(p,b),0)/m.length }
-function considerAllianceKicks(p){ for(const [name,list] of Object.entries(alliances)){ if(!list.includes(p)) continue; if(averageRelWithAlliance(p,name)<-2 && Math.random()<0.5){ alliances[name]=list.filter(x=>x!==p); queueRelUpdate(`${p} is removed from Alliance ${name} due to frayed relationships.`); } } updateAlliances(); }
-function maybeFormNewAllianceFromBonds(){ const free=players.slice(); for(let i=0;i<free.length;i++) for(let j=i+1;j<free.length;j++){ const a=free[i],b=free[j]; if(getRel(a,b)>=4 && !inAlliance(a,b) && Math.random()<0.25){ const name=pickNewAllianceName(); alliances[name]=[a,b]; const third=free.find(x=>x!==a&&x!==b && getRel(a,x)>=3 && getRel(b,x)>=3); if(third) alliances[name].push(third); queueRelUpdate(`New Alliance ${name} forms via strong bonds: ${alliances[name].join(', ')}`); updateAlliances(); return; } } }
-function penalizeNonAllyDuel(decider,opponent,alliesAvail){ if(alliesAvail && !inAlliance(decider,opponent)){ const allySet=new Set(); for(const list of Object.values(alliances)){ if(list.includes(decider)) list.forEach(x=>{ if(x!==decider) allySet.add(x) }); } allySet.forEach(ally=>incRel(decider,ally,-2)); } }
-function pickNewAllianceName(){ const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''); for(const c of A){ if(!alliances[c]) return c; } return 'Z'+Math.floor(Math.random()*99); }
+function averageRelWithAlliance(p,A){
+  var m=alliances[A].filter(function(x){return x!==p});
+  if(!m.length) return 0;
+  var s=0; for(var i=0;i<m.length;i++) s+=getRel(p,m[i]);
+  return s/m.length;
+}
+function considerAllianceKicks(p){
+  var entries=Object.entries(alliances);
+  for(var i=0;i<entries.length;i++){
+    var name=entries[i][0], list=entries[i][1];
+    if(list.indexOf(p)===-1) continue;
+    if(averageRelWithAlliance(p,name)<-2 && Math.random()<0.5){
+      alliances[name]=list.filter(function(x){return x!==p});
+      queueRelUpdate(p+' is removed from Alliance '+name+' due to frayed relationships.');
+    }
+  }
+  updateAlliances();
+}
+function maybeFormNewAllianceFromBonds(){
+  var free=players.slice();
+  for(var i=0;i<free.length;i++){
+    for(var j=i+1;j<free.length;j++){
+      var a=free[i], b=free[j];
+      if(getRel(a,b)>=4 && !inAlliance(a,b) && Math.random()<0.25){
+        var name=pickNewAllianceName(); alliances[name]=[a,b];
+        // maybe add a third
+        var third=null;
+        for(var k=0;k<free.length;k++){
+          var x=free[k]; if(x===a||x===b) continue;
+          if(getRel(a,x)>=3 && getRel(b,x)>=3){ third=x; break; }
+        }
+        if(third) alliances[name].push(third);
+        queueRelUpdate('New Alliance '+name+' forms via strong bonds: '+alliances[name].join(', '));
+        updateAlliances(); return;
+      }
+    }
+  }
+}
+function penalizeNonAllyDuel(decider,opponent,alliesAvail){
+  if(alliesAvail && !inAlliance(decider,opponent)){
+    var allySet={};
+    var lists=Object.values(alliances);
+    for(var i=0;i<lists.length;i++){
+      var L=lists[i];
+      if(L.indexOf(decider)!==-1){
+        for(var j=0;j<L.length;j++){ var x=L[j]; if(x!==decider) allySet[x]=1; }
+      }
+    }
+    for(var name in allySet){ incRel(decider,name,-2); }
+  }
+}
+function pickNewAllianceName(){
+  var A='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  for(var i=0;i<A.length;i++){ if(!alliances[A[i]]) return A[i]; }
+  return 'Z'+Math.floor(Math.random()*99);
+}
 function updateAlliances(){
-  const box=document.getElementById('alliancesList');
-  if(!box) return; // safety if panel missing/hidden
+  var box=document.getElementById('alliancesList');
+  if(!box) return;
   box.innerHTML='';
-  Object.entries(alliances).forEach(([n,m])=>{
-    const vis=m.filter(x=>initialOrder.includes(x));
-    if(vis.length) box.innerHTML+=`<strong>Alliance ${n}</strong>: ${vis.join(', ')}<br/>`;
-  });
+  var entries=Object.entries(alliances);
+  for(var i=0;i<entries.length;i++){
+    var n=entries[i][0], m=entries[i][1];
+    var vis=m.filter(function(x){return initialOrder.indexOf(x)!==-1});
+    if(vis.length) box.innerHTML+='<strong>Alliance '+n+'</strong>: '+vis.join(', ')+'<br/>';
+  }
 }
 
-/* ====== Progress ====== */
+/* ===== Progress ===== */
 function updateProgress(){
-  const chart=document.getElementById('progressChart');
-  const everyone=players.concat(eliminated.filter(p=>!players.includes(p)));
-  let html=`<div class="table-scroll"><table><tr><th>Player</th><th>P1</th><th>P2</th><th>Final</th></tr>`;
-  everyone.forEach(p=>{ const p1=keys[p]?.includes('P1')?`<span class="pill ok">✔</span>`:`<span class="pill no">—</span>`;
-    const p2=keys[p]?.includes('P2')?`<span class="pill ok">✔</span>`:`<span class="pill no">—</span>`;
-    const pf=finalists.includes(p)?`<span class="pill ok">✔</span>`:`<span class="pill no">—</span>`;
-    html+=`<tr><td>${p}</td><td>${p1}</td><td>${p2}</td><td>${pf}</td></tr>`; });
-  html+=`</table></div>`; chart.innerHTML=html;
+  var chart=document.getElementById('progressChart');
+  var everyone=players.concat(eliminated.filter(function(p){return players.indexOf(p)===-1}));
+  var html='<div class="table-scroll"><table><tr><th>Player</th><th>P1</th><th>P2</th><th>Final</th></tr>';
+  for(var i=0;i<everyone.length;i++){
+    var p=everyone[i];
+    var p1=(keys[p]&&keys[p].indexOf('P1')!==-1)?'<span class="pill ok">✔</span>':'<span class="pill no">—</span>';
+    var p2=(keys[p]&&keys[p].indexOf('P2')!==-1)?'<span class="pill ok">✔</span>':'<span class="pill no">—</span>';
+    var pf=(finalists.indexOf(p)!==-1)?'<span class="pill ok">✔</span>':'<span class="pill no">—</span>';
+    html+='<tr><td>'+p+'</td><td>'+p1+'</td><td>'+p2+'</td><td>'+pf+'</td></tr>';
+  }
+  html+='</table></div>';
+  chart.innerHTML=html;
 }
 
-/* ====== Episodes helper ====== */
-function snapshotRelAverages(){ const names=players.concat(eliminated).concat(jury.map(j=>j.name)).filter((v,i,a)=>a.indexOf(v)===i); const avg={}; names.forEach(n=>{ const others=names.filter(x=>x!==n); const vals=others.map(o=>getRel(n,o)); avg[n]=vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):0; }); relTimeline.push({episode:episodes.length,avgRelByPlayer:avg}); }
+/* ===== Episodes helper ===== */
+function snapshotRelAverages(){
+  var names=players.concat(eliminated).concat(jury.map(function(j){return j.name}));
+  // unique
+  var seen={}, uniq=[]; for(var i=0;i<names.length;i++){ if(!seen[names[i]]){ seen[names[i]]=1; uniq.push(names[i]); } }
+  var avg={}, n, others, vals, s;
+  for(i=0;i<uniq.length;i++){
+    n=uniq[i]; others=uniq.filter(function(x){return x!==n}); vals=[];
+    for(var j=0;j<others.length;j++){ vals.push(getRel(n,others[j])); }
+    s=0; for(j=0;j<vals.length;j++) s+=vals[j];
+    avg[n]=vals.length? s/vals.length : 0;
+  }
+  relTimeline.push({episode:episodes.length, avgRelByPlayer:avg});
+}
 
-/* ====== Phase 1 ====== */
+/* ===== Phase 1 ===== */
 function runPhase1(){
-  newEpisode(`Episode ${episodes.length+1} (Phase 1 R${round})`); pushScene('Events');
+  newEpisode('Episode '+(episodes.length+1)+' (Phase 1 R'+round+')'); pushScene('Events');
   flushRelUpdates('Pre‑round relationship updates');
-  if(round>4 || Object.values(keys).filter(k=>k.includes('P1')).length>=8) return endPhase1();
 
-  const eligible=players.filter(p=>!keys[p].includes('P1')); const drawn=shuffle(eligible).slice(0,4);
-  log(`Phase 1 – Round ${round}`); log(`Drawn: ${drawn.join(', ')}`);
+  var p1Count=0, pk=Object.values(keys);
+  for(var i=0;i<pk.length;i++){ if(pk[i].indexOf && pk[i].indexOf('P1')!==-1) p1Count++; }
+  if(round>4 || p1Count>=8){ endPhase1(); return; }
 
-  const beastInDrawn=drawn.some(p=>(stats[p]?.challenge??8)>=13); const findChance=0.33 + (beastInDrawn?0.01:0);
-  if(!lockpickFound && Math.random()<findChance){ lockpickHolder=drawn[Math.floor(Math.random()*drawn.length)]; lockpickFound=true; log(`${lockpickHolder} discovers the Lockpick.`); }
+  var eligible=players.filter(function(p){return keys[p].indexOf('P1')===-1});
+  var drawn=shuffle(eligible).slice(0,4);
+  log('Phase 1 – Round '+round); log('Drawn: '+drawn.join(', '));
 
-  const votePairs=simulateVote(knownVoters,drawn); let [voteWinner]=tally(votePairs,drawn);
-  votePairs.forEach(([v,to])=>{ if(to===voteWinner && inAlliance(v,voteWinner)) incRel(v,voteWinner,+1); });
+  var beastInDrawn=false;
+  for(i=0;i<drawn.length;i++){ if((stats[drawn[i]]?stats[drawn[i]].challenge:8)>=13){ beastInDrawn=true; break; } }
+  var findChance=0.33 + (beastInDrawn?0.01:0);
+  if(!lockpickFound && Math.random()<findChance){ lockpickHolder=drawn[Math.floor(Math.random()*drawn.length)]; lockpickFound=true; log(lockpickHolder+' discovers the Lockpick.'); }
+
+  var votePairs=simulateVote(knownVoters,drawn); var tallyRes=tally(votePairs,drawn); var voteWinner=tallyRes[0];
+  for(i=0;i<votePairs.length;i++){ var v=votePairs[i][0], to=votePairs[i][1]; if(to===voteWinner && inAlliance(v,voteWinner)) incRel(v,voteWinner,+1); }
   flushRelUpdates('Post‑vote updates');
 
-  let lockUser=null;
-  if(lockpickHolder && !lockpickUsed && drawn.includes(lockpickHolder)){
-    const mustUse=(round===4 && !keys[lockpickHolder].includes('P1')); const willUse=mustUse || Math.random()<0.2;
-    if(willUse){ voteWinner=lockpickHolder; lockUser=lockpickHolder; lockpickUsed=true; log(`${lockpickHolder} uses the Lockpick to override the vote.`); }
+  var lockUser=null;
+  if(lockpickHolder && !lockpickUsed && drawn.indexOf(lockpickHolder)!==-1){
+    var mustUse=(round===4 && keys[lockpickHolder].indexOf('P1')===-1);
+    var willUse=mustUse || Math.random()<0.2;
+    if(willUse){ voteWinner=lockpickHolder; lockUser=lockpickHolder; lockpickUsed=true; log(lockpickHolder+' uses the Lockpick to override the vote.'); }
   }
-  addVoteColumn(`P1 R${round}`,'P1',round,knownVoters,votePairs,voteWinner,lockUser);
-  keys[voteWinner].push('P1'); (keysEarned[voteWinner].P1++); log(`${voteWinner} wins the vote key.`);
+  addVoteColumn('P1 R'+round,'P1',round,knownVoters,votePairs,voteWinner,lockUser);
+  keys[voteWinner].push('P1'); if(!keysEarned[voteWinner]) keysEarned[voteWinner]={P1:0,P2:0}; keysEarned[voteWinner].P1++; log(voteWinner+' wins the vote key.');
 
-  const challengers=drawn.filter(p=>p!==voteWinner && !keys[p].includes('P1'));
-  if(challengers.length>0){ const challengeWinner=weightedChoice(challengers,p=>Math.pow((stats[p]?.challenge??8),BETA_CHALLENGE)); keys[challengeWinner].push('P1'); (keysEarned[challengeWinner].P1++); log(`${challengeWinner} wins the challenge key.`); } else { log(`No challenge key awarded.`); }
+  var challengers=drawn.filter(function(p){return p!==voteWinner && keys[p].indexOf('P1')===-1});
+  if(challengers.length>0){
+    var challengeWinner=weightedChoice(challengers, function(p){return Math.pow((stats[p]?stats[p].challenge:8),BETA_CHALLENGE)});
+    keys[challengeWinner].push('P1'); keysEarned[challengeWinner].P1++; log(challengeWinner+' wins the challenge key.');
+  } else { log('No challenge key awarded.'); }
 
   maybeFormNewAllianceFromBonds(); flushRelUpdates('Post‑challenge updates');
 
@@ -454,213 +693,339 @@ function runPhase1(){
   snapshotRelAverages(); round++;
 }
 function endPhase1(){
-  const adv=players.filter(p=>keys[p].includes('P1')); const out=players.filter(p=>!adv.includes(p));
-  out.forEach(p=>{ if(!eliminated.includes(p)) eliminated.push(p) }); out.forEach(p=>jury.push({name:p,phase:1}));
-  players=adv; log(`Phase 1 complete. Eliminated: ${out.join(', ')}`); renderMasterVoteTable(); updateAlliances(); renderRelsLive();
+  var adv=players.filter(function(p){return keys[p].indexOf('P1')!==-1});
+  var out=players.filter(function(p){return adv.indexOf(p)===-1});
+  for(var i=0;i<out.length;i++){ if(eliminated.indexOf(out[i])===-1) eliminated.push(out[i]); jury.push({name:out[i],phase:1}); }
+  players=adv.slice();
+  log('Phase 1 complete. Eliminated: '+out.join(', '));
+  renderMasterVoteTable(); updateAlliances(); renderRelsLive();
   round=1; phase=2; nextRound();
 }
 
-/* ====== Phase 2 ====== */
+/* ===== Phase 2 ===== */
 function runPhase2(){
-  newEpisode(`Episode ${episodes.length+1} (Phase 2 R${round})`); pushScene('Events');
+  newEpisode('Episode '+(episodes.length+1)+' (Phase 2 R'+round+')'); pushScene('Events');
   flushRelUpdates('Pre‑round relationship updates');
-  if(round>4 || Object.values(keys).filter(k=>k.includes('P2')).length>=4) return endPhase2();
 
-  log(`Phase 2 – Round ${round}`);
-  const noKey=players.filter(p=>!keys[p].includes('P2')); if(noKey.length<2){ log('Not enough no‑key players for another duel.'); return endPhase2(); }
+  var p2Count=0, pk=Object.values(keys);
+  for(var i=0;i<pk.length;i++){ if(pk[i].indexOf && pk[i].indexOf('P2')!==-1) p2Count++; }
+  if(round>4 || p2Count>=4){ endPhase2(); return; }
 
-  const votePairs=simulateVote(players,noKey); let [voteWinner]=tally(votePairs,noKey);
-  votePairs.forEach(([v,to])=>{ if(to===voteWinner && inAlliance(v,voteWinner)) incRel(v,voteWinner,+1); });
+  log('Phase 2 – Round '+round);
+  var noKey=players.filter(function(p){return keys[p].indexOf('P2')===-1});
+  if(noKey.length<2){ log('Not enough no‑key players for another duel.'); endPhase2(); return; }
+
+  var votePairs=simulateVote(players,noKey); var tallyRes=tally(votePairs,noKey); var voteWinner=tallyRes[0];
+  for(i=0;i<votePairs.length;i++){ var v=votePairs[i][0], to=votePairs[i][1]; if(to===voteWinner && inAlliance(v,voteWinner)) incRel(v,voteWinner,+1); }
   flushRelUpdates('Post‑vote updates');
 
-  let lockUser=null;
-  if(lockpickHolder && !lockpickUsed && noKey.includes(lockpickHolder) && !keys[lockpickHolder].includes('P2')){
-    if(Math.random()<0.6){ voteWinner=lockpickHolder; lockUser=lockpickHolder; lockpickUsed=true; log(`${lockpickHolder} uses the Lockpick to auto‑win the vote.`); }
+  var lockUser=null;
+  if(lockpickHolder && !lockpickUsed && noKey.indexOf(lockpickHolder)!==-1 && keys[lockpickHolder].indexOf('P2')===-1){
+    if(Math.random()<0.6){ voteWinner=lockpickHolder; lockUser=lockpickHolder; lockpickUsed=true; log(lockpickHolder+' uses the Lockpick to auto‑win the vote.'); }
   }
-  addVoteColumn(`P2 R${round}`,'P2',round,knownVoters,votePairs,voteWinner,lockUser);
+  addVoteColumn('P2 R'+round,'P2',round,knownVoters,votePairs,voteWinner,lockUser);
 
-  const candidates=noKey.filter(p=>p!==voteWinner), nonAllies=candidates.filter(p=>!inAlliance(p,voteWinner)), allies=candidates.filter(p=>inAlliance(p,voteWinner));
-  let opponent,reason; const alliesAvail=allies.length>0;
-  if(allies.length && Math.random()<0.55){ opponent=weightedChoice(allies,p=>1/Math.max(1,(stats[p]?.challenge??8))*relFactor(voteWinner,p)); reason='keeps the key within their alliance'; incRel(voteWinner,opponent,+2); }
-  else if(nonAllies.length){ opponent=weightedChoice(nonAllies,p=>Math.pow(1/Math.max(1,(stats[p]?.challenge??8)),GAMMA_BEATABLE)*relFactor(voteWinner,p)); reason='chooses someone they believe they can beat'; if(alliesAvail) penalizeNonAllyDuel(voteWinner,opponent,true); }
-  else { opponent=weightedChoice(candidates,p=>relFactor(voteWinner,p)); reason='makes a neutral pick'; }
-  log(`${voteWinner} chooses to duel ${opponent} — ${reason}.`);
+  var candidates=noKey.filter(function(p){return p!==voteWinner});
+  var allies=candidates.filter(function(p){return inAlliance(p,voteWinner)}), nonAllies=candidates.filter(function(p){return !inAlliance(p,voteWinner)});
+  var opponent=null, reason='', alliesAvail=allies.length>0;
+  if(allies.length && Math.random()<0.55){
+    opponent=weightedChoice(allies, function(p){return 1/Math.max(1,(stats[p]?stats[p].challenge:8))*relFactor(voteWinner,p)});
+    reason='keeps the key within their alliance'; incRel(voteWinner,opponent,+2);
+  } else if(nonAllies.length){
+    opponent=weightedChoice(nonAllies, function(p){return Math.pow(1/Math.max(1,(stats[p]?stats[p].challenge:8)),GAMMA_BEATABLE)*relFactor(voteWinner,p)});
+    reason='chooses someone they believe they can beat'; if(alliesAvail) penalizeNonAllyDuel(voteWinner,opponent,true);
+  } else {
+    opponent=weightedChoice(candidates, function(p){return relFactor(voteWinner,p)}); reason='makes a neutral pick';
+  }
+  log(voteWinner+' chooses to duel '+opponent+' — '+reason+'.');
   flushRelUpdates('Post‑pick updates');
 
-  const pWin=duelWinProb(voteWinner,opponent); const dWinner=Math.random()<pWin?voteWinner:opponent; const dLoser=dWinner===voteWinner?opponent:voteWinner;
-  keys[dWinner].push('P2'); (keysEarned[dWinner].P2++); (duelWins[dWinner]++); (duelLosses[dLoser]++); log(`${dWinner} wins the duel and earns a Phase 2 key.`);
+  var pWin=duelWinProb(voteWinner,opponent);
+  var dWinner=Math.random()<pWin?voteWinner:opponent, dLoser=(dWinner===voteWinner?opponent:voteWinner);
+  keys[dWinner].push('P2'); keysEarned[dWinner].P2++; duelWins[dWinner]++; duelLosses[dLoser]++; log(dWinner+' wins the duel and earns a Phase 2 key.');
 
   considerAllianceKicks(voteWinner); maybeFormNewAllianceFromBonds(); flushRelUpdates('Post‑duel updates');
 
   updateProgress(); renderRelsLive(); updateAlliances(); snapshotRelAverages(); round++;
 }
 function endPhase2(){
-  const adv=players.filter(p=>keys[p].includes('P2')); const out=players.filter(p=>!adv.includes(p));
-  out.forEach(p=>{ if(!eliminated.includes(p)) eliminated.push(p) }); out.forEach(p=>jury.push({name:p,phase:2}));
-  players=adv; log(`Phase 2 complete. Eliminated: ${out.join(', ')}`); renderMasterVoteTable(); renderRelsLive(); updateAlliances();
+  var adv=players.filter(function(p){return keys[p].indexOf('P2')!==-1});
+  var out=players.filter(function(p){return adv.indexOf(p)===-1});
+  for(var i=0;i<out.length;i++){ if(eliminated.indexOf(out[i])===-1) eliminated.push(out[i]); jury.push({name:out[i],phase:2}); }
+  players=adv.slice();
+  log('Phase 2 complete. Eliminated: '+out.join(', '));
+  renderMasterVoteTable(); renderRelsLive(); updateAlliances();
   round=1; phase=3; phase3Step=0; nextRound();
 }
 
-/* ====== Phase 3 ====== */
-let p3_voteWinner=null,p3_chosenAlly=null,p3_duelists=[];
+/* ===== Phase 3 (two-step) ===== */
+var p3_voteWinner=null, p3_chosenAlly=null, p3_duelists=[];
 function runPhase3(){
   if(phase3Step===0){
-    newEpisode(`Episode ${episodes.length+1} (Phase 3 Vote)`); pushScene('Events');
+    newEpisode('Episode '+(episodes.length+1)+' (Phase 3 Vote)'); pushScene('Events');
     flushRelUpdates('Pre‑vote updates');
 
-    log(`Phase 3 — Final Cut: Vote step`);
-    const raw=simulateVote(players,players);
-    const votePairs=raw.map(([v,to])=> v===to ? (()=>{
-      const choices=players.filter(p=>p!==v);
-      return [v, weightedChoice(choices, choices.map(c=>{ const s=stats[c]?.social??8; const j=VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN); return Math.pow(s,ALPHA_SOCIAL)*j*relFactor(v,c); }))];
-    })() : [v,to]);
-    const [voteWinner]=tally(votePairs,players);
+    log('Phase 3 — Final Cut: Vote step');
 
-    // F4 tie logic
+    var raw=simulateVote(players,players);
+    var votePairs=[];
+    for(var i=0;i<raw.length;i++){
+      var v=raw[i][0], to=raw[i][1];
+      if(v===to){
+        var choices=players.filter(function(p){return p!==v});
+        var choice=weightedChoice(choices, choices.map(function(c){
+          var s=(stats[c]?stats[c].social:8);
+          var j=VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN);
+          return Math.pow(s,ALPHA_SOCIAL)*j*relFactor(v,c);
+        }));
+        votePairs.push([v,choice]);
+      } else {
+        votePairs.push([v,to]);
+      }
+    }
+    var tr=tally(votePairs,players); var voteWinner=tr[0];
+
+    // Final 4 tie rules
     if(players.length===4){
-      const cm={}; players.forEach(p=>cm[p]=0); votePairs.forEach(([_,to])=>cm[to]++);
-      const vals=Object.values(cm); const maxV=Math.max(...vals); const tiedTop=Object.keys(cm).filter(p=>cm[p]===maxV);
-      if(new Set(vals).size===1){
-        log(`Final 4 vote is a four‑way tie! All four compete; top three advance.`);
-        const perf=players.map(p=>({p,score:(stats[p]?.challenge??8)*(0.8+Math.random()*0.4)})).sort((a,b)=>b.score-a.score;
-        const advancing=perf.slice(0,3).map(x=>x.p); const fourth=perf[3].p;
-        finalists=advancing.slice(); jury.push({name:fourth,phase:3}); if(!eliminated.includes(fourth)) eliminated.push(fourth);
-        log(`Challenge order: ${perf.map(x=>x.p).join(' > ')}`); log(`${fourth} finishes last and is eliminated; the others advance.`);
+      var cm={}, k; for(i=0;i<players.length;i++) cm[players[i]]=0;
+      for(i=0;i<votePairs.length;i++) cm[votePairs[i][1]]++;
+      var vals=Object.values(cm), maxV=Math.max.apply(null, vals);
+      var tiedTop=Object.keys(cm).filter(function(p){return cm[p]===maxV});
+      var allEqual=true; for(i=0;i<vals.length-1;i++){ if(vals[i]!==vals[i+1]){ allEqual=false; break; } }
+      if(allEqual){
+        log('Final 4 vote is a four‑way tie! All four compete; top three advance.');
+        var perf=players.map(function(p){ return {p:p, score:(stats[p]?stats[p].challenge:8)*(0.8+Math.random()*0.4)}; });
+        perf.sort(function(a,b){return b.score-a.score});
+        var advancing=[perf[0].p, perf[1].p, perf[2].p], fourth=perf[3].p;
+        finalists=advancing.slice(); jury.push({name:fourth,phase:3}); if(eliminated.indexOf(fourth)===-1) eliminated.push(fourth);
+        log('Challenge order: '+perf.map(function(x){return x.p}).join(' > '));
+        log(fourth+' finishes last and is eliminated; the others advance.');
         updateProgress(); renderRelsLive(); phase=4; snapshotRelAverages(); return;
       }
       if(tiedTop.length===2){
-        const nonTied=players.filter(p=>!tiedTop.includes(p)); finalists=nonTied.slice();
-        log(`Final 4 vote two‑way tie between ${tiedTop[0]} and ${tiedTop[1]}. They duel for the final spot. Others advance: ${nonTied.join(', ')}.`);
-        const a=tiedTop[0], b=tiedTop[1], pWin=duelWinProb(a,b); const dW=Math.random()<pWin?a:b, dL=dW===a?b:a;
-        finalists.push(dW); jury.push({name:dL,phase:3}); if(!eliminated.includes(dL)) eliminated.push(dL); duelWins[dW]++; duelLosses[dL]++;
-        log(`${dW} wins the tiebreak duel. ${dL} is eliminated and becomes the 4th juror.`);
+        var nonTied=players.filter(function(p){return tiedTop.indexOf(p)===-1}); finalists=nonTied.slice();
+        log('Final 4 vote two‑way tie between '+tiedTop[0]+' and '+tiedTop[1]+'. They duel for the final spot. Others advance: '+nonTied.join(', ')+'.');
+        var a=tiedTop[0], b=tiedTop[1], pWin=duelWinProb(a,b);
+        var dW=Math.random()<pWin?a:b, dL=(dW===a?b:a);
+        finalists.push(dW); jury.push({name:dL,phase:3}); if(eliminated.indexOf(dL)===-1) eliminated.push(dL); duelWins[dW]++; duelLosses[dL]++;
+        log(dW+' wins the tiebreak duel. '+dL+' is eliminated and becomes the 4th juror.');
         updateProgress(); renderRelsLive(); phase=4; snapshotRelAverages(); return;
       }
     }
 
-    p3_voteWinner=voteWinner; log(`${voteWinner} wins the vote and becomes a finalist.`);
-    const available=players.filter(p=>p!==voteWinner); const ally=available.filter(p=>inAlliance(p,voteWinner));
-    const pool=ally.length? ally:available;
-    p3_chosenAlly=weightedChoice(pool,p=>((stats[p]?.social??8)+0.1*(16-(stats[p]?.challenge??8)))*relFactor(voteWinner,p));
+    p3_voteWinner=voteWinner; log(voteWinner+' wins the vote and becomes a finalist.');
+    var available=players.filter(function(p){return p!==voteWinner});
+    var ally=available.filter(function(p){return inAlliance(p,voteWinner)});
+    var pool=ally.length? ally : available;
+    p3_chosenAlly=weightedChoice(pool, function(p){ var soc=(stats[p]?stats[p].social:8); var ch=(stats[p]?stats[p].challenge:8); return (soc+0.1*(16-ch))*relFactor(voteWinner,p); });
     if(inAlliance(voteWinner,p3_chosenAlly)) incRel(voteWinner,p3_chosenAlly,+2);
-    addVoteColumn(`P3 Vote`,'P3',1,knownVoters,votePairs,voteWinner,null);
+    addVoteColumn('P3 Vote','P3',1,knownVoters,votePairs,voteWinner,null);
     flushRelUpdates('Post‑selection updates');
 
-    p3_duelists=players.filter(p=>p!==voteWinner && p!==p3_chosenAlly);
-    log(`${voteWinner} selects ${p3_chosenAlly} to join them. Next: ${p3_duelists[0]} vs ${p3_duelists[1]} for the last spot. Click Next to resolve.`);
+    p3_duelists=players.filter(function(p){return p!==voteWinner && p!==p3_chosenAlly});
+    log(voteWinner+' selects '+p3_chosenAlly+' to join them. Next: '+p3_duelists[0]+' vs '+p3_duelists[1]+' for the last spot. Click Next to resolve.');
     finalists=[p3_voteWinner,p3_chosenAlly]; updateProgress(); renderRelsLive(); phase3Step=1; snapshotRelAverages(); return;
   }
 
   if(phase3Step===1){
-    newEpisode(`Episode ${episodes.length+1} (Phase 3 Duel)`); pushScene('Events');
+    newEpisode('Episode '+(episodes.length+1)+' (Phase 3 Duel)'); pushScene('Events');
     flushRelUpdates('Pre‑duel updates');
 
-    const a=p3_duelists[0], b=p3_duelists[1], pWin=duelWinProb(a,b);
-    const dW=Math.random()<pWin?a:b, dL=dW===a?b:a; finalists.push(dW); if(!eliminated.includes(dL)) eliminated.push(dL);
-    jury.push({name:dL,phase:3}); duelWins[dW]++; duelLosses[dL]++; log(`${dW} wins the final duel. ${dL} is eliminated and joins the jury.`);
+    var a=p3_duelists[0], b=p3_duelists[1], pWin=duelWinProb(a,b);
+    var dW=Math.random()<pWin?a:b, dL=(dW===a?b:a);
+    finalists.push(dW); if(eliminated.indexOf(dL)===-1) eliminated.push(dL);
+    jury.push({name:dL,phase:3}); duelWins[dW]++; duelLosses[dL]++;
+    log(dW+' wins the final duel. '+dL+' is eliminated and joins the jury.');
     flushRelUpdates('Post‑duel updates');
 
-    updateProgress(); renderRelsLive(); phase=4; phase3Step=0; log(`Click Next to proceed to the Vault Finale.`); snapshotRelAverages();
+    updateProgress(); renderRelsLive(); phase=4; phase3Step=0; log('Click Next to proceed to the Vault Finale.'); snapshotRelAverages();
   }
 }
 
-/* ====== Finale (3 screens) ====== */
+/* ===== Finale (3 screens) ===== */
 function runFinale(){
   if(finaleStep===0){
-    newEpisode(`Episode ${episodes.length+1} (Finale — Jury)`); pushScene('Events'); flushRelUpdates('Pre‑jury updates');
+    newEpisode('Episode '+(episodes.length+1)+' (Finale — Jury)'); pushScene('Events'); flushRelUpdates('Pre‑jury updates');
     if(!finaleState.finalistKeys){
-      finaleState.finalistKeys={}; finalists.forEach(p=>finaleState.finalistKeys[p]=3);
-      const supportScore={}; finalists.forEach(f=>{ let s=0; jury.forEach(j=>{ const cap=j.phase===1?1:j.phase===2?2:4; if(inAlliance(j.name,f)) s+=cap; }); supportScore[f]=s + 0.4*(stats[f]?.social??8); });
-      const expect={}, maxS=Math.max(1,...Object.values(supportScore)); finalists.forEach(f=> expect[f]=Math.round(6 + (supportScore[f]/maxS)*6) );
+      finaleState.finalistKeys={}; for(var i=0;i<finalists.length;i++) finaleState.finalistKeys[finalists[i]]=3;
+      var supportScore={}, f;
+      for(i=0;i<finalists.length;i++){ f=finalists[i]; var s=0;
+        for(var j=0;j<jury.length;j++){ var cap=(jury[j].phase===1?1:(jury[j].phase===2?2:4)); if(inAlliance(jury[j].name,f)) s+=cap; }
+        supportScore[f]=s + 0.4*(stats[f]?stats[f].social:8);
+      }
+      var expect={}, maxS=1; for(f in supportScore){ if(supportScore[f]>maxS) maxS=supportScore[f]; }
+      for(f in supportScore){ expect[f]=Math.round(6 + (supportScore[f]/maxS)*6); }
       finaleState.chosenVaults=pickUniqueVaultsForFinalists(expect);
       finaleState.juryMatrix=distributeJuryKeysExact16(finalists,jury,finaleState.finalistKeys);
-      finalists.forEach(f=> juryKeysReceived[f]=(finaleState.finalistKeys[f]-3) );
+      for(i=0;i<finalists.length;i++){ f=finalists[i]; juryKeysReceived[f]=(finaleState.finalistKeys[f]-3); }
     }
-    log(`Vault Finale — Jury awards keys now.`); displayJuryMatrix(finaleState.juryMatrix); log(`Click Next to reveal vault openings.`); finaleStep=1; snapshotRelAverages(); return;
+    log('Vault Finale — Jury awards keys now.');
+    displayJuryMatrix(finaleState.juryMatrix);
+    log('Click Next to reveal vault openings.');
+    finaleStep=1; snapshotRelAverages(); return;
   }
 
   if(finaleStep===1){
-    newEpisode(`Episode ${episodes.length+1} (Finale — Open Vaults)`); pushScene('Events'); flushRelUpdates('Pre‑open updates');
-    log(`Vault selections: ${finalists.map(f=>`${f} → ${finaleState.chosenVaults[f]} keys`).join(', ')}`); finalists.forEach(f=> log(`${f} has ${finaleState.finalistKeys[f]} total keys.`) );
-    const result=finalists.map(n=>({name:n,keys:finaleState.finalistKeys[n],vault:finaleState.chosenVaults[n]})).sort((a,b)=>b.vault-a.vault);
-    finaleState.resultList=result; finaleState.winner=result.find(r=>r.keys>=r.vault)||null; log(`Click Next to reveal the winner.`); finaleStep=2; snapshotRelAverages(); return;
+    newEpisode('Episode '+(episodes.length+1)+' (Finale — Open Vaults)'); pushScene('Events'); flushRelUpdates('Pre‑open updates');
+    var s1=[]; for(var i=0;i<finalists.length;i++){ var f=finalists[i]; s1.push(f+' → '+finaleState.chosenVaults[f]+' keys'); }
+    log('Vault selections: '+s1.join(', '));
+    for(i=0;i<finalists.length;i++){ f=finalists[i]; log(f+' has '+finaleState.finalistKeys[f]+' total keys.'); }
+    var result=finalists.map(function(n){return {name:n,keys:finaleState.finalistKeys[n],vault:finaleState.chosenVaults[n]}});
+    result.sort(function(a,b){return b.vault-a.vault});
+    finaleState.resultList=result; finaleState.winner=null;
+    for(i=0;i<result.length;i++){ if(result[i].keys>=result[i].vault){ finaleState.winner=result[i]; break; } }
+    log('Click Next to reveal the winner.');
+    finaleStep=2; snapshotRelAverages(); return;
   }
 
   if(finaleStep===2){
-    newEpisode(`Episode ${episodes.length+1} (Finale — Winner)`); pushScene('Events'); flushRelUpdates('Pre‑reveal updates');
-    if(!finaleState.winner){ const fourth=jury.find(j=>j.phase===3)?.name||'Fourth Place'; log(`No finalist opened a vault. ${fourth} wins by default.`); }
-    else { log(`${finaleState.winner.name} opens the ${finaleState.winner.vault}-key vault with ${finaleState.winner.keys} keys and wins.`); }
+    newEpisode('Episode '+(episodes.length+1)+' (Finale — Winner)'); pushScene('Events'); flushRelUpdates('Pre‑reveal updates');
+    if(!finaleState.winner){
+      var fourth=null; for(var i=0;i<jury.length;i++){ if(jury[i].phase===3){ fourth=jury[i].name; break; } }
+      log('No finalist opened a vault. '+(fourth||'Fourth Place')+' wins by default.');
+    } else {
+      log(finaleState.winner.name+' opens the '+finaleState.winner.vault+'‑key vault with '+finaleState.winner.keys+' keys and wins.');
+    }
     endGameUI(); snapshotRelAverages();
   }
 }
 
-/* ====== Finale helpers + jury matrix ====== */
-function pickUniqueVaultsForFinalists(expect){ const picked={}, avail=vaults.slice(), order=Object.keys(expect).sort((a,b)=>expect[b]-expect[a]); order.forEach(f=>{ let best=avail[0],bestDiff=Infinity,bestIdx=0; avail.forEach((v,i)=>{ const d=Math.abs(v-expect[f]); if(d<bestDiff){bestDiff=d; best=v; bestIdx=i;} }); picked[f]=best; avail.splice(bestIdx,1); }); return picked; }
+/* ===== Finale helpers + jury matrix ===== */
+function pickUniqueVaultsForFinalists(expect){
+  var picked={}, avail=vaults.slice();
+  var order=Object.keys(expect).sort(function(a,b){return expect[b]-expect[a]});
+  for(var i=0;i<order.length;i++){
+    var f=order[i], best=avail[0], bestDiff=Infinity, bestIdx=0;
+    for(var j=0;j<avail.length;j++){ var v=avail[j], d=Math.abs(v-expect[f]); if(d<bestDiff){bestDiff=d; best=v; bestIdx=j;} }
+    picked[f]=best; avail.splice(bestIdx,1);
+  }
+  return picked;
+}
 function distributeJuryKeysExact16(finalists,jury,finalistKeys){
-  const capPool=[]; jury.forEach(j=>{ const cap=j.phase===1?1:j.phase===2?2:4; for(let i=0;i<cap;i++) capPool.push(j.name); }); shuffle(capPool); const draws=capPool.slice(0,16);
-  const jm={}; jury.forEach(j=>{ jm[j.name]=Object.fromEntries(finalists.map(f=>[f,0])) });
-  function allianceSupportForFinalist(f){ let s=0; jury.forEach(j=>{ const cap=j.phase===1?1:j.phase===2?2:4; if(inAlliance(j.name,f)) s+=cap; }); return s; }
-  const base={}; finalists.forEach(f=>{ base[f]=allianceSupportForFinalist(f) + 0.6*(stats[f]?.social??8); });
-  function normalize(str){ const vals=finalists.map(f=>str[f]), sorted=vals.slice().sort((x,y)=>y-x), top=sorted[0],sec=sorted[1]??sorted[0], disp=(top-sec)/(top||1);
-    const T=disp>=0.5?0.55:disp>=0.25?0.7:0.9; const exp={}, sum=finalists.reduce((a,f)=>{ exp[f]=Math.exp((str[f])/T); return a+exp[f]; },0); let probs={}; finalists.forEach(f=>probs[f]=exp[f]/sum);
-    const uni=1/finalists.length, lambda=disp>=0.5?0.05:disp>=0.25?0.18:0.35; finalists.forEach(f=>probs[f]=(1-lambda)*probs[f]+lambda*uni); return probs; }
-  const baseProbs=normalize(base);
-  draws.forEach(jName=>{ const j=jury.find(x=>x.name===jName); let probs={...baseProbs}; const allied=finalists.filter(f=>inAlliance(j.name,f)); if(allied.length===1){ probs[allied[0]]*=1.15; let s=0; finalists.forEach(f=>s+=probs[f]); finalists.forEach(f=>probs[f]/=s); }
-    const target=weightedChoice(finalists,f=>probs[f]); jm[jName][target]+=1; finalistKeys[target]+=1; });
+  var capPool=[], i,j;
+  for(i=0;i<jury.length;i++){ var cap=(jury[i].phase===1?1:(jury[i].phase===2?2:4)); for(j=0;j<cap;j++) capPool.push(jury[i].name); }
+  capPool=shuffle(capPool); var draws=capPool.slice(0,16);
+  var jm={}, f; for(i=0;i<jury.length;i++){ var name=jury[i].name; jm[name]={}; for(j=0;j<finalists.length;j++){ jm[name][finalists[j]]=0; } }
+
+  function allianceSupportForFinalist(f){
+    var s=0; for(var k=0;k<jury.length;k++){ var cap=(jury[k].phase===1?1:(jury[k].phase===2?2:4)); if(inAlliance(jury[k].name,f)) s+=cap; } return s;
+  }
+  var base={}, top=-Infinity, sec=-Infinity;
+  for(i=0;i<finalists.length;i++){ f=finalists[i]; base[f]=allianceSupportForFinalist(f) + 0.6*(stats[f]?stats[f].social:8); if(base[f]>top){ sec=top; top=base[f]; } else if(base[f]>sec){ sec=base[f]; } }
+  function smoothProbs(str){
+    var T; var disp=(top-sec)/(top||1);
+    if(disp>=0.5) T=0.55; else if(disp>=0.25) T=0.7; else T=0.9;
+    var exp={}, sum=0, f;
+    for(f in str){ exp[f]=Math.exp(str[f]/T); sum+=exp[f]; }
+    var probs={}, uni=1/finalists.length, lambda=(disp>=0.5)?0.05:(disp>=0.25?0.18:0.35);
+    for(f in str){ probs[f]=((exp[f]/sum)*(1-lambda)) + (lambda*uni); }
+    return probs;
+  }
+  var baseProbs=smoothProbs(base);
+
+  for(i=0;i<draws.length;i++){
+    var jName=draws[i];
+    var probs={}, f; for(f in baseProbs) probs[f]=baseProbs[f];
+    var allied=finalists.filter(function(ff){return inAlliance(jName,ff)});
+    if(allied.length===1){ // nudge lone ally
+      probs[allied[0]]*=1.15; var s=0; for(f in probs) s+=probs[f]; for(f in probs) probs[f]/=s;
+    }
+    var target=weightedChoice(finalists, function(ff){return probs[ff]});
+    jm[jName][target]+=1; finalistKeys[target]+=1;
+  }
   return jm;
 }
 function displayJuryMatrix(matrix){
-  const area=document.getElementById('juryMatrix'); if(!finalists.length){ area.innerHTML=''; return }
-  let html=`<div class="table-scroll"><table><tr><th>Juror</th>${finalists.map(f=>`<th>${avatarChip(f)}</th>`).join('')}<th>Total</th></tr>`;
-  let total=0; for(const juror in matrix){ let sum=0; html+=`<tr><td>${avatarChip(juror,true)}</td>`; finalists.forEach(f=>{ const v=matrix[juror][f]||0; sum+=v; total+=v; html+=`<td>${v}</td>`; }); html+=`<td>${sum}</td></tr>`; }
-  html+=`</table></div><div class="hint">Total jury keys distributed: <strong>${total}</strong> (should be exactly 16)</div>`; area.innerHTML=html;
+  var area=document.getElementById('juryMatrix'); if(!finalists.length){ area.innerHTML=''; return; }
+  var html='<div class="table-scroll"><table><tr><th>Juror</th>';
+  for(var i=0;i<finalists.length;i++){ html+='<th>'+avatarChip(finalists[i])+'</th>'; }
+  html+='<th>Total</th></tr>';
+  var total=0; for(var juror in matrix){
+    var sum=0; html+='<tr><td>'+avatarChip(juror,true)+'</td>';
+    for(i=0;i<finalists.length;i++){ var f=finalists[i]; var v=(matrix[juror][f]||0); sum+=v; total+=v; html+='<td>'+v+'</td>'; }
+    html+='<td>'+sum+'</td></tr>';
+  }
+  html+='</table></div><div class="hint">Total jury keys distributed: <strong>'+total+'</strong> (should be exactly 16)</div>';
+  area.innerHTML=html;
 }
-function avatarChip(name){ const c=cast[name]||{photo:'',color:'#7aa2ff'}; const av=c.photo?`<img src="${c.photo}" class="avatar" alt="${name}">`:`<div class="avatar" style="background:${c.color}">${initials(name)}</div>`; return `<span class="chip" style="border-color:${c.color}">${av}<span>${name}</span></span>`; }
+function avatarChip(name){
+  var c=cast[name]||{photo:'',color:'#7aa2ff'};
+  var av=c.photo?('<img src="'+c.photo+'" class="avatar" alt="'+name+'">'):'<div class="avatar" style="background:'+c.color+'">'+initials(name)+'</div>';
+  return '<span class="chip" style="border-color:'+c.color+'">'+av+'<span>'+name+'</span></span>';
+}
 
-/* ====== Modals & Recaps ====== */
+/* ===== Modals & Recaps ===== */
 function openModal(id){ document.getElementById(id).style.display='flex'; if(id==='episodesModal') renderEpisode(epIndex); }
 function closeModal(id){ document.getElementById(id).style.display='none'; }
-function renderEpisodesButton(){ const b=document.getElementById('openEpisodes'); b.style.display='inline-block'; b.textContent=`Episode Recaps (${episodes.length})`; if(epIndex<0 && episodes.length) epIndex=0; }
-function setEpIndex(i){ epIndex=(i+episodes.length)%episodes.length; renderEpisode(epIndex); }
-function renderEpisode(i){ if(i<0||i>=episodes.length) return; const ep=episodes[i]; document.getElementById('epTitle').textContent=`${i+1} / ${episodes.length} — ${ep.title}`; document.getElementById('epContent').innerHTML= ep.scenes.map(s=>`<div class="box"><h2>${s.label}</h2><pre>${s.lines.join('\n')}</pre></div>`).join('') || '<div class="muted">No scenes captured.</div>'; }
-function openSeasonModal(){ const area=document.getElementById('seasonContent'); let html=''; episodes.forEach((ep,idx)=>{ html+=`<div class="box"><h2>Episode ${idx+1}: ${ep.title}</h2>`; ep.scenes.forEach(sc=>{ html+=`<div class="small" style="margin:6px 0;"><strong>${sc.label}</strong></div><pre>${sc.lines.join('\n')}</pre>`; }); html+=`</div>`; }); area.innerHTML=html||'<div class="muted">No episodes yet.</div>'; openModal('seasonModal'); }
+function renderEpisodesButton(){ var b=document.getElementById('openEpisodes'); b.style.display='inline-block'; b.textContent='Episode Recaps ('+episodes.length+')'; if(epIndex<0 && episodes.length) epIndex=0; }
+function setEpIndex(i){ if(!episodes.length) return; epIndex=(i+episodes.length)%episodes.length; renderEpisode(epIndex); }
+function renderEpisode(i){
+  if(i<0||i>=episodes.length) return;
+  var ep=episodes[i], content='';
+  document.getElementById('epTitle').textContent=(i+1)+' / '+episodes.length+' — '+ep.title;
+  for(var s=0;s<ep.scenes.length;s++){
+    var sc=ep.scenes[s]; content+='<div class="box"><h2>'+sc.label+'</h2><pre>'+sc.lines.join('\n')+'</pre></div>';
+  }
+  document.getElementById('epContent').innerHTML=content||'<div class="muted">No scenes captured.</div>';
+}
+function openSeasonModal(){
+  var area=document.getElementById('seasonContent'), html='';
+  for(var i=0;i<episodes.length;i++){
+    var ep=episodes[i]; html+='<div class="box"><h2>Episode '+(i+1)+': '+ep.title+'</h2>';
+    for(var s=0;s<ep.scenes.length;s++){ var sc=ep.scenes[s]; html+='<div class="small" style="margin:6px 0;"><strong>'+sc.label+'</strong></div><pre>'+sc.lines.join('\n')+'</pre>'; }
+    html+='</div>';
+  }
+  area.innerHTML=html||'<div class="muted">No episodes yet.</div>';
+  openModal('seasonModal');
+}
 
-/* ====== Post‑Season Stats ====== */
+/* ===== Post‑Season Stats ===== */
 function openStatsModal(){
-  const area=document.getElementById('statsContent');
-  let duelHtml=`<div class="box"><h2>Duel Records</h2><div class="table-scroll"><table><tr><th>Player</th><th>Wins</th><th>Losses</th></tr>`;
-  initialOrder.forEach(p=> duelHtml+=`<tr><td>${avatarChip(p)}</td><td>${duelWins[p]||0}</td><td>${duelLosses[p]||0}</td></tr>`); duelHtml+=`</table></div></div>`;
+  var area=document.getElementById('statsContent'), i;
+  var duelHtml='<div class="box"><h2>Duel Records</h2><div class="table-scroll"><table><tr><th>Player</th><th>Wins</th><th>Losses</th></tr>';
+  for(i=0;i<initialOrder.length;i++){ var p=initialOrder[i]; duelHtml+='<tr><td>'+avatarChip(p)+'</td><td>'+(duelWins[p]||0)+'</td><td>'+(duelLosses[p]||0)+'</td></tr>'; }
+  duelHtml+='</table></div></div>';
 
-  let keyHtml=`<div class="box"><h2>Keys Earned</h2><div class="table-scroll"><table><tr><th>Player</th><th>P1</th><th>P2</th><th>Jury Keys Received</th><th>Total Keys (Final)</th></tr>`;
-  initialOrder.forEach(p=>{ const p1=keysEarned[p]?.P1||0,p2=keysEarned[p]?.P2||0,jr=juryKeysReceived[p]||0; const finalTotal=finalists.includes(p)?((finaleState.finalistKeys?.[p]||3)):(p1+p2); keyHtml+=`<tr><td>${avatarChip(p)}</td><td>${p1}</td><td>${p2}</td><td>${jr}</td><td>${finalTotal}</td></tr>`; }); keyHtml+=`</table></div></div>`;
+  var keyHtml='<div class="box"><h2>Keys Earned</h2><div class="table-scroll"><table><tr><th>Player</th><th>P1</th><th>P2</th><th>Jury Keys Received</th><th>Total Keys (Final)</th></tr>';
+  for(i=0;i<initialOrder.length;i++){
+    var name=initialOrder[i], p1=(keysEarned[name]?keysEarned[name].P1:0), p2=(keysEarned[name]?keysEarned[name].P2:0), jr=(juryKeysReceived[name]||0);
+    var finalTotal=(finalists.indexOf(name)!==-1)?((finaleState.finalistKeys && finaleState.finalistKeys[name])||3):(p1+p2);
+    keyHtml+='<tr><td>'+avatarChip(name)+'</td><td>'+p1+'</td><td>'+p2+'</td><td>'+jr+'</td><td>'+finalTotal+'</td></tr>';
+  }
+  keyHtml+='</table></div></div>';
 
-  let voteHtml=`<div class="box"><h2>Votes Given / Received</h2><div class="table-scroll"><table><tr><th>Player</th><th>Given</th><th>Received</th></tr>`;
-  initialOrder.forEach(p=> voteHtml+=`<tr><td>${avatarChip(p)}</td><td>${votesGiven[p]||0}</td><td>${votesReceived[p]||0}</td></tr>` ); voteHtml+=`</table></div></div>`;
+  var voteHtml='<div class="box"><h2>Votes Given / Received</h2><div class="table-scroll"><table><tr><th>Player</th><th>Given</th><th>Received</th></tr>';
+  for(i=0;i<initialOrder.length;i++){ var nm=initialOrder[i]; voteHtml+='<tr><td>'+avatarChip(nm)+'</td><td>'+(votesGiven[nm]||0)+'</td><td>'+(votesReceived[nm]||0)+'</td></tr>'; }
+  voteHtml+='</table></div></div>';
 
-  const selId='relTimelineSelect';
-  let relCtrl=`<div class="box"><h2>Relationship Timeline</h2>
-    <div class="rowwrap" style="align-items:center"><label class="muted">Player</label><select id="${selId}">${initialOrder.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
-    <div class="svgwrap"><svg id="relSvg" width="800" height="200" viewBox="0 0 800 200"></svg></div>
-    <div class="small">Average relationship score per episode (−5..+5). Zero line marked.</div></div>`;
+  var selId='relTimelineSelect';
+  var relCtrl='<div class="box"><h2>Relationship Timeline</h2>'+
+    '<div class="rowwrap" style="align-items:center"><label class="muted">Player</label><select id="'+selId+'">'+initialOrder.map(function(p){return '<option value="'+p+'">'+p+'</option>'}).join('')+'</select></div>'+
+    '<div class="svgwrap"><svg id="relSvg" width="800" height="200" viewBox="0 0 800 200"></svg></div>'+
+    '<div class="small">Average relationship score per episode (−5..+5). Zero line marked.</div></div>';
 
-  area.innerHTML=duelHtml+keyHtml+voteHtml+relCtrl; openModal('statsModal');
-  const select=document.getElementById(selId); select.onchange=()=>drawRelTimeline(select.value); drawRelTimeline(select.value);
+  area.innerHTML=duelHtml+keyHtml+voteHtml+relCtrl;
+  openModal('statsModal');
+  var select=document.getElementById(selId); select.onchange=function(){ drawRelTimeline(select.value) }; drawRelTimeline(select.value);
 }
 function drawRelTimeline(name){
-  const svg=document.getElementById('relSvg'); if(!svg) return;
-  const W=800,H=200,P=30; svg.innerHTML='';
-  const zeroY=H/2; svg.innerHTML+=`<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="#3b4252" stroke-dasharray="4 4"/>`;
-  const pts=relTimeline.map((ep,i)=>({x:i,y:ep.avgRelByPlayer[name]??0})); if(!pts.length) return;
-  const maxX=Math.max(1,pts.length-1), xS=(W-2*P)/maxX, yS=(H-2*P)/10;
-  const path=pts.map((p,i)=>{ const x=P+i*xS, y=H/2 - p.y*yS; return `${i===0?'M':'L'} ${x} ${y}`; }).join(' ');
-  const col=(cast[name]?.color)||'#7aa2ff'; svg.innerHTML+=`<path d="${path}" fill="none" stroke="${col}" stroke-width="2"/>`; pts.forEach((p,i)=>{ const x=P+i*xS,y=H/2 - p.y*yS; svg.innerHTML+=`<circle cx="${x}" cy="${y}" r="3" fill="${col}"/>`; });
-  svg.innerHTML+=`<text x="${P}" y="${P-8}" fill="#aeb4c0" font-size="12">${name}</text>`; svg.innerHTML+=`<text x="${W-P}" y="${H-8}" fill="#aeb4c0" font-size="12" text-anchor="end">Episodes (${pts.length})</text>`;
+  var svg=document.getElementById('relSvg'); if(!svg) return;
+  var W=800,H=200,P=30; svg.innerHTML='';
+  var zeroY=H/2; svg.innerHTML+='<line x1="0" y1="'+zeroY+'" x2="'+W+'" y2="'+zeroY+'" stroke="#3b4252" stroke-dasharray="4 4"/>';
+  var pts=relTimeline.map(function(ep,i){ return {x:i,y:(ep.avgRelByPlayer[name]||0)}; }); if(!pts.length) return;
+  var maxX=Math.max(1,pts.length-1), xS=(W-2*P)/maxX, yS=(H-2*P)/10;
+  var path=''; for(var i=0;i<pts.length;i++){ var x=P+i*xS, y=H/2 - pts[i].y*yS; path+=(i===0?'M':'L')+' '+x+' '+y+' '; }
+  var col=(cast[name]&&cast[name].color)?cast[name].color:'#7aa2ff';
+  svg.innerHTML+='<path d="'+path.trim()+'" fill="none" stroke="'+col+'" stroke-width="2"/>';
+  for(i=0;i<pts.length;i++){ var cx=P+i*xS, cy=H/2 - pts[i].y*yS; svg.innerHTML+='<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+col+'"/>'; }
+  svg.innerHTML+='<text x="'+P+'" y="'+(P-8)+'" fill="#aeb4c0" font-size="12">'+name+'</text>';
+  svg.innerHTML+='<text x="'+(W-P)+'" y="'+(H-8)+'" fill="#aeb4c0" font-size="12" text-anchor="end">Episodes ('+pts.length+')</text>';
 }
 
-/* ====== Keep preseason UIs wired ====== */
-function renderEpisodesButton(){ const b=document.getElementById('openEpisodes'); b.style.display='inline-block'; b.textContent=`Episode Recaps (${episodes.length})`; if(epIndex<0 && episodes.length) epIndex=0; }
+/* ===== Keep preseason UIs wired ===== */
+function renderEpisodesButton(){ var b=document.getElementById('openEpisodes'); b.style.display='inline-block'; b.textContent='Episode Recaps ('+episodes.length+')'; if(epIndex<0 && episodes.length) epIndex=0; }
 
-/* ====== END ====== */
+/* ===== END ===== */
 </script>
 </body>
 </html>
