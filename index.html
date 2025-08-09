@@ -32,15 +32,14 @@
     .pill{display:inline-block;min-width:20px;border-radius:6px;padding:2px 6px}
     .ok{background:rgba(110,231,183,.15);border:1px solid rgba(110,231,183,.35)}
     .no{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3)}
-    .flex{display:flex;gap:18px;flex-wrap:wrap}
-    .half{flex:1 1 420px}
-    .right{max-width:520px}
-    .hint{color:var(--sub);font-size:13px;margin-top:6px}
-    .badge{display:inline-block;padding:2px 6px;border-radius:6px;background:var(--muted);font-size:12px;margin-left:6px}
     .table-scroll{overflow:auto;max-width:100%}
     .stats-input{width:70px}
     .rowwrap{display:flex;gap:18px;flex-wrap:wrap}
     .third{flex:1 1 240px}
+    .right{max-width:520px}
+    .hint{color:var(--sub);font-size:13px;margin-top:6px}
+    .badge{display:inline-block;padding:2px 6px;border-radius:6px;background:var(--muted);font-size:12px;margin-left:6px}
+    .muted{color:var(--sub)}
   </style>
 </head>
 <body>
@@ -52,7 +51,7 @@
     <textarea id="playerInput" rows="12" placeholder="Player 1&#10;Player 2&#10;..."></textarea>
     <button id="startBtn">Start Game</button>
     <button id="nextBtn" style="display:none;">Next</button>
-    <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote step, then duel step) → Finale (Jury → Open → Winner).</div>
+    <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote step, then duel step) → Finale (Jury → Open → Winner). F4 special: 4‑way tie = 4‑player challenge, top 3 advance.</div>
   </div>
 
   <div class="rowwrap">
@@ -69,9 +68,15 @@
       <div class="hint">Range: 1–15. Defaults to 8/8. Stats lock after you click Start Game.</div>
     </div>
 
-    <div class="box third">
-      <h2>Round Events</h2>
-      <pre id="roundEvents"></pre>
+    <div class="box third" id="relsPreBox">
+      <h2>Relationships (Preseason)</h2>
+      <div class="hint">Optional. One pair per line as <code>Name1,Name2,score</code>. Score −5..+5 (bond &gt; 0, feud &lt; 0). You can also click Randomize Mild.</div>
+      <textarea id="relInput" rows="10" placeholder="Alice,Bob,3&#10;Cara,Dee,-2"></textarea>
+      <div class="rowwrap">
+        <button id="relRandom" class="third">Randomize Mild</button>
+        <button id="relClear" class="third">Clear</button>
+        <button id="relApply" class="third">Apply Relationships</button>
+      </div>
     </div>
 
     <div class="box third right">
@@ -81,14 +86,24 @@
   </div>
 
   <div class="box">
+    <h2>Relationships (Live)</h2>
+    <div id="relsLive"></div>
+  </div>
+
+  <div class="box">
+    <h2>Round Events</h2>
+    <pre id="roundEvents"></pre>
+  </div>
+
+  <div class="box">
     <h2>Progress Chart</h2>
     <div id="progressChart"></div>
   </div>
 
   <div class="box">
     <h2>Voting Matrix (Season)</h2>
-    <div class="table-scroll" id="votingMatrix"></div>
-    <div class="hint">Plain text. LOCKPICK appears in the voter’s cell if used that round. Eliminated voters are kept and reordered: active/finalists, then Phase 3 eliminated, Phase 2 eliminated, Phase 1 eliminated.</div>
+    <div id="votingMatrix"></div>
+    <div class="hint">Plain text. LOCKPICK appears in the voter’s cell if used that round. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
   </div>
 
   <div class="box">
@@ -98,7 +113,7 @@
 
 <script>
 /* ====== Tunables ====== */
-const ALPHA_SOCIAL = 0.65;  // lower social gravity to reduce landslides
+const ALPHA_SOCIAL = 0.65;  // social gravity for votes
 const BETA_CHALLENGE = 1.0; // P1 challenge weighting
 const GAMMA_BEATABLE = 1.2; // opponent selection inverse challenge exponent
 const LOGIT_K = 0.7;        // duel steepness
@@ -108,7 +123,11 @@ const WIN_CLAMP_HI = 0.85;  // max duel win prob
 // Vote “noise” + partial ally preference to avoid herding
 const VOTE_JITTER_MIN = 0.8;
 const VOTE_JITTER_MAX = 1.2;
-const ALLY_PREFERENCE_RATE = 0.6; // only ~60% of voters prioritize allies each round
+const ALLY_PREFERENCE_RATE = 0.6; // ~60% prioritize allies
+
+// Relationships effect: multiplicative factor 1 + REL_SCALE * score
+const REL_SCALE = 0.08;     // ±8% per point (–5..+5 ⇒ 0.6×..1.4×)
+const REL_MIN_FACTOR = 0.3; // safety floor when feuds are deep
 
 /* ====== State ====== */
 let players = [];
@@ -148,18 +167,27 @@ let finaleState = {
 // Stats
 let stats = {}; // { name: {social:8, challenge:8} }
 
+// Relationships matrix (symmetric): rel[A][B] = integer -5..+5
+let rel = {};   // { A: {B: score} }
+
 /* ====== DOM ====== */
 const startBtn = document.getElementById('startBtn');
 const nextBtn  = document.getElementById('nextBtn');
 const roundsBox= document.getElementById('roundEvents');
 const statsBox = document.getElementById('statsBox');
+const relsPreBox = document.getElementById('relsPreBox');
 const statsTableDiv = document.getElementById('statsTable');
+const relInput = document.getElementById('relInput');
 
 document.getElementById('applyStats').onclick = applyStatsFromInputs;
 document.getElementById('presetBalanced').onclick  = ()=>presetStats('balanced');
 document.getElementById('presetSocial').onclick    = ()=>presetStats('social');
 document.getElementById('presetChallenge').onclick = ()=>presetStats('challenge');
 document.getElementById('presetRandom').onclick    = ()=>presetStats('random');
+
+document.getElementById('relRandom').onclick = randomizeRelationshipsMild;
+document.getElementById('relClear').onclick  = ()=>{ relInput.value=''; rel = {}; renderRelsLive(); };
+document.getElementById('relApply').onclick  = applyRelationshipsFromInput;
 
 startBtn.onclick = startGame;
 nextBtn.onclick  = nextRound;
@@ -178,17 +206,29 @@ function inAlliance(a,b){
 }
 function getElimPhase(name){ const j = jury.find(x=>x.name===name); return j ? j.phase : null }
 
+function setRel(a,b,val){
+  if(!rel[a]) rel[a]={};
+  if(!rel[b]) rel[b]={};
+  rel[a][b] = val;
+  rel[b][a] = val;
+}
+function getRel(a,b){
+  if(!rel[a] || rel[a][b]===undefined) return 0;
+  return rel[a][b];
+}
+function incRel(a,b,delta){
+  const v = clamp(getRel(a,b)+delta, -5, 5);
+  setRel(a,b,v);
+}
+
 /* Weighted helpers */
 function weightedChoice(items, weightArg){
-  // weightArg can be a function(item)->weight OR an array of weights
   let weights;
   if (typeof weightArg === 'function') {
     weights = items.map(x => Math.max(0.0001, weightArg(x)));
   } else {
     weights = (weightArg || []).slice();
-    if (weights.length !== items.length) {
-      weights = items.map(_ => 1);
-    }
+    if (weights.length !== items.length) weights = items.map(_ => 1);
   }
   const sum = weights.reduce((a,b)=>a+b,0);
   let r = Math.random()*sum;
@@ -204,6 +244,10 @@ function duelWinProb(a,b){
   const p = 1 / (1 + Math.exp(-LOGIT_K * (da - db)));
   return clamp(p, WIN_CLAMP_LO, WIN_CLAMP_HI);
 }
+function relFactor(voter, target){
+  const rf = 1 + REL_SCALE * getRel(voter, target);
+  return clamp(rf, REL_MIN_FACTOR, 2); // cap at 2x to be safe
+}
 
 /* ====== Start / Next / Reset ====== */
 function startGame(){
@@ -216,19 +260,17 @@ function startGame(){
   initialOrder = input.slice();
   knownVoters = input.slice();
   players.forEach(p => keys[p] = []);
+  players.forEach(p => { if(!stats[p]) stats[p] = {social:8, challenge:8}; if(!rel[p]) rel[p]={}; });
 
-  // Default stats 8/8 if not set
-  players.forEach(p=>{
-    if(!stats[p]) stats[p] = {social:8, challenge:8};
-  });
-
-  // Lock the stats UI
+  // Lock the preseason UIs
   statsBox.style.display = 'none';
+  relsPreBox.style.display = 'none';
 
   generateAlliances();
   updateAlliances();
   updateProgress();
   renderMasterVoteTable();
+  renderRelsLive();
 
   log('Phase 1 begins: The Key Quest starts now.');
   startBtn.style.display = 'none';
@@ -292,17 +334,92 @@ function presetStats(which){
     if(which==='social'){    stats[n].social = 12; stats[n].challenge = 8; }
     if(which==='challenge'){ stats[n].social = 8;  stats[n].challenge = 12; }
     if(which==='random'){
-      stats[n].social    = Math.floor(1 + Math.random()*15);     // 1–15
-      stats[n].challenge = Math.floor(1 + Math.random()*15);     // 1–15
+      stats[n].social    = Math.floor(1 + Math.random()*15);
+      stats[n].challenge = Math.floor(1 + Math.random()*15);
     }
   });
   buildStatsTable();
 }
 
+/* ====== Relationships UI (Preseason) ====== */
+function randomizeRelationshipsMild(){
+  const names = getPlist();
+  // mild spread -2..+2
+  names.forEach(a=>{
+    names.forEach(b=>{
+      if(a>=b) return;
+      const v = Math.floor(-2 + Math.random()*5); // -2..+2
+      if(v!==0) setRel(a,b,v);
+    });
+  });
+  relInput.value = serializeRelPairs();
+  log('Preseason relationships randomized (mild).');
+  renderRelsLive();
+}
+function applyRelationshipsFromInput(){
+  const lines = relInput.value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
+  for(const line of lines){
+    const m = line.split(',').map(s=>s.trim());
+    if(m.length!==3) continue;
+    const [a,b,sv] = m;
+    const val = clamp(parseInt(sv,10), -5, 5);
+    if(a && b) setRel(a,b,val);
+  }
+  log('Preseason relationships applied.');
+  renderRelsLive();
+}
+function serializeRelPairs(){
+  const names = getPlist();
+  const seen = new Set();
+  const out = [];
+  names.forEach(a=>{
+    names.forEach(b=>{
+      if(a===b) return;
+      const key = [a,b].sort().join('|');
+      if(seen.has(key)) return;
+      const v = getRel(a,b);
+      if(v!==0) out.push(`${a},${b},${v}`);
+      seen.add(key);
+    });
+  });
+  return out.join('\n');
+}
+
+/* Show top bonds/rivalries live */
+function renderRelsLive(){
+  const wrap = document.getElementById('relsLive');
+  if(!players.length && !Object.keys(stats).length){ wrap.innerHTML=''; return; }
+  const names = players.length ? players : getPlist();
+  const pairs = [];
+  const seen = new Set();
+  names.forEach(a=>{
+    names.forEach(b=>{
+      if(a===b) return;
+      const key = [a,b].sort().join('|');
+      if(seen.has(key)) return;
+      seen.add(key);
+      pairs.push({a,b,v:getRel(a,b)});
+    });
+  });
+  pairs.sort((x,y)=>Math.abs(y.v)-Math.abs(x.v));
+  const topBonds = pairs.filter(p=>p.v>0).slice(0,6);
+  const topFeuds = pairs.filter(p=>p.v<0).slice(0,6);
+
+  let html = `<div class="rowwrap">
+    <div class="third"><strong>Top Bonds</strong><br/>` +
+      (topBonds.length? topBonds.map(p=>`${p.a} ↔ ${p.b} (+${p.v})`).join('<br/>') : '<span class="muted">None yet</span>') +
+      `</div>
+    <div class="third"><strong>Top Rivalries</strong><br/>` +
+      (topFeuds.length? topFeuds.map(p=>`${p.a} ↔ ${p.b} (${p.v})`).join('<br/>') : '<span class="muted">None yet</span>') +
+      `</div>
+  </div>`;
+  wrap.innerHTML = html;
+}
+
 /* Render initial empty stats table */
 buildStatsTable();
 
-/* ====== Voting Core (secret, Social‑weighted with jitter & partial ally pref) ====== */
+/* ====== Voting Core (secret, relationships-weighted) ====== */
 function simulateVote(voters, eligible){
   return voters.map(v=>{
     const choices = eligible.filter(p=>p!==v);
@@ -315,7 +432,8 @@ function simulateVote(voters, eligible){
     const weights = pool.map(cand=>{
       const social = (stats[cand]?.social ?? 8);
       const jitter = VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN);
-      return Math.pow(social, baseAlpha) * jitter;
+      const rf = relFactor(v, cand);
+      return Math.pow(social, baseAlpha) * jitter * rf;
     });
 
     const pick = weightedChoice(pool, weights);
@@ -346,7 +464,6 @@ function renderMasterVoteTable(){
   voteColumns.forEach(c => { html += `<th>${c.label}</th>`; });
   html += `</tr></thead><tbody>`;
 
-  // ordering: active/finalists → P3 elim → P2 elim → P1 elim
   const activeRows = players.slice();
   const elimP3 = eliminated.filter(n=>getElimPhase(n)===3);
   const elimP2 = eliminated.filter(n=>getElimPhase(n)===2);
@@ -365,16 +482,13 @@ function renderMasterVoteTable(){
   elimP2.forEach(renderRow);
   elimP1.forEach(renderRow);
 
-  // result row
   html += `<tr><th>Result</th>`;
   voteColumns.forEach(c => { html += `<th>${c.result || ''}</th>`; });
-  html += `</tr>`;
-
-  html += `</tbody></table></div>`;
+  html += `</tr></tbody></table></div>`;
   wrap.innerHTML = html;
 }
 
-/* ====== Alliances (fluid, only duel snubs cause kicks) ====== */
+/* ====== Alliances (fluid, relationship-aware) ====== */
 function generateAlliances(){
   alliances = {};
   const count = Math.floor(Math.random()*3)+2; // 2..4
@@ -393,33 +507,62 @@ function generateAlliances(){
   });
 }
 
-function penalizeNonAllyDuel(decider, opponent, alliesAvailable){
-  if(!alliesAvailable) return;
-  if(inAlliance(decider, opponent)) return; // they did pick an ally
-  const decAlliances = Object.entries(alliances).filter(([_,list])=>list.includes(decider)).map(([n])=>n);
-  if(!decAlliances.length) return;
-  if(Math.random() < 0.5){
-    const kickFrom = decAlliances[Math.floor(Math.random()*decAlliances.length)];
-    const arr = alliances[kickFrom];
-    const idx = arr.indexOf(decider);
-    if(idx>-1){
-      arr.splice(idx,1);
-      log(`${decider} is removed from Alliance ${kickFrom} after snubbing allies in a duel pick.`);
-      updateAlliances();
+function averageRelWithAlliance(p, allianceName){
+  const members = alliances[allianceName].filter(x=>x!==p);
+  if(!members.length) return 0;
+  const sum = members.reduce((a,b)=>a+getRel(p,b),0);
+  return sum / members.length;
+}
+
+function considerAllianceKicks(p){
+  // If average relationship with any alliance is < -2, 50% chance to be removed
+  for(const [name, list] of Object.entries(alliances)){
+    if(!list.includes(p)) continue;
+    if(averageRelWithAlliance(p, name) < -2 && Math.random() < 0.5){
+      alliances[name] = list.filter(x=>x!==p);
+      log(`${p} is removed from Alliance ${name} due to frayed relationships.`);
+    }
+  }
+  updateAlliances();
+}
+
+function maybeFormNewAllianceFromBonds(){
+  // If two non-teammates have mutual bond >= 4, small chance to form a new alliance
+  const free = players.slice();
+  for(let i=0;i<free.length;i++){
+    for(let j=i+1;j<free.length;j++){
+      const a=free[i], b=free[j];
+      if(getRel(a,b) >= 4 && !inAlliance(a,b) && Math.random()<0.25){
+        const name = pickNewAllianceName();
+        alliances[name] = [a,b];
+        // Optionally add a third bonded member
+        const third = free.find(x=>x!==a&&x!==b && getRel(a,x)>=3 && getRel(b,x)>=3);
+        if(third) alliances[name].push(third);
+        log(`New Alliance ${name} forms via strong bonds: ${alliances[name].join(', ')}`);
+        updateAlliances();
+        return;
+      }
     }
   }
 }
 
-function evolveAlliancesMidgame(){
-  if(Math.random()<0.25 && players.length>=4){
-    const size = Math.floor(Math.random()*3)+2; // 2..4
-    const cand = shuffle(players).slice(0, size);
-    const newName = pickNewAllianceName();
-    alliances[newName] = cand.slice();
-    log(`New Alliance ${newName} forms: ${cand.join(', ')}`);
-    updateAlliances();
+function penalizeNonAllyDuel(decider, opponent, alliesAvailable){
+  // Our rule: picking non‑ally when allies were available is anti‑alliance → feud up
+  if(alliesAvailable && !inAlliance(decider, opponent)){
+    const decAllies = Object.values(alliances).flatMap(([..._])=>[]);
+    // Gather all allies of decider in any alliance
+    const allySet = new Set();
+    for(const list of Object.values(alliances)){
+      if(list.includes(decider)){
+        list.forEach(x=>{ if(x!==decider) allySet.add(x) });
+      }
+    }
+    allySet.forEach(ally=> incRel(decider, ally, -2));
+    log(`${decider} snubs allies by picking a non‑ally for the duel. Trust drops inside their alliances.`);
+    considerAllianceKicks(decider);
   }
 }
+
 function pickNewAllianceName(){
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   for(const c of alphabet){
@@ -476,9 +619,14 @@ function runPhase1(){
     log(`${lockpickHolder} discovers the Lockpick.`);
   }
 
-  // Secret vote among drawn, Social‑weighted with jitter & partial ally pref
+  // Secret vote among drawn, relationships‑weighted
   const votePairs = simulateVote(knownVoters, drawn);
   let [voteWinner] = tally(votePairs, drawn);
+
+  // Relationship bump: voters who voted for an ALLY winner bond +1
+  votePairs.forEach(([v,to])=>{
+    if(to===voteWinner && inAlliance(v, voteWinner)) incRel(v, voteWinner, +1);
+  });
 
   // Strategic Lockpick use in P1
   let lockUser = null;
@@ -495,11 +643,10 @@ function runPhase1(){
 
   addVoteColumn(`P1 R${round}`, 'P1', round, knownVoters, votePairs, voteWinner, lockUser);
 
-  // Award vote key
   keys[voteWinner].push('P1');
   log(`${voteWinner} wins the vote key.`);
 
-  // Challenge among remaining drawn w/out P1 — weighted by Challenge^BETA
+  // Challenge among remaining drawn w/out P1 — weighted by Challenge
   const challengers = drawn.filter(p=>p!==voteWinner && !keys[p].includes('P1'));
   if(challengers.length>0){
     const challengeWinner = weightedChoice(challengers, p => Math.pow((stats[p]?.challenge ?? 8), BETA_CHALLENGE));
@@ -509,8 +656,12 @@ function runPhase1(){
     log(`No challenge key awarded.`);
   }
 
-  evolveAlliancesMidgame();
+  // Natural alliance shifts from relationships
+  maybeFormNewAllianceFromBonds();
+
   updateProgress();
+  renderRelsLive();
+  updateAlliances();
   round++;
 }
 
@@ -524,6 +675,8 @@ function endPhase1(){
   players = advancing;
   log(`Phase 1 complete. Eliminated: ${phaseOut.join(', ')}`);
   renderMasterVoteTable();
+  updateAlliances();
+  renderRelsLive();
   round = 1; phase = 2;
   nextRound();
 }
@@ -544,6 +697,11 @@ function runPhase2(){
   const votePairs = simulateVote(players, noKey);
   let [voteWinner] = tally(votePairs, noKey);
 
+  // Relationship bump: voting an ally into power is good
+  votePairs.forEach(([v,to])=>{
+    if(to===voteWinner && inAlliance(v, voteWinner)) incRel(v, voteWinner, +1);
+  });
+
   // Lockpick in P2: if holder lacks P2, often used
   let lockUser = null;
   if(lockpickHolder && !lockpickUsed && noKey.includes(lockpickHolder) && !keys[lockpickHolder].includes('P2')){
@@ -557,39 +715,43 @@ function runPhase2(){
 
   addVoteColumn(`P2 R${round}`, 'P2', round, knownVoters, votePairs, voteWinner, lockUser);
 
-  // Opponent choice — reason + stat‑influenced selection
+  // Opponent choice — relationship-aware
   const candidates = noKey.filter(p=>p!==voteWinner);
   const nonAllies = candidates.filter(p=>!inAlliance(p, voteWinner));
   const allies    = candidates.filter(p=> inAlliance(p, voteWinner));
-
   let opponent, reason;
-  let alliesAvailable = allies.length>0;
+  const alliesAvailable = allies.length>0;
 
-  if(nonAllies.length && Math.random()<0.65){
-    // choose someone they believe they can beat: prefer lower Challenge
-    opponent = weightedChoice(nonAllies, p => Math.pow(1/Math.max(1,(stats[p]?.challenge ?? 8)), GAMMA_BEATABLE));
-    reason = 'chooses someone they believe they can beat';
-  }else if(allies.length){
-    // keep in alliance: avoid the absolute strongest ally to reduce risk of losing
-    opponent = weightedChoice(allies, p => 1/Math.max(1,(stats[p]?.challenge ?? 8)));
+  if(allies.length && Math.random()<0.55){
+    // Keep key in alliance: pick an ally (loyal move). Slightly prefer not-the-strongest ally.
+    opponent = weightedChoice(allies, p => 1/Math.max(1,(stats[p]?.challenge ?? 8)) * relFactor(voteWinner, p));
     reason = 'keeps the key within their alliance';
+    incRel(voteWinner, opponent, +2); // bonding for picking ally to duel
+  }else if(nonAllies.length){
+    // Beat them: prefer someone weaker; relationships still nudge
+    opponent = weightedChoice(nonAllies, p => Math.pow(1/Math.max(1,(stats[p]?.challenge ?? 8)), GAMMA_BEATABLE) * relFactor(voteWinner, p));
+    reason = 'chooses someone they believe they can beat';
+    // If allies existed but ignored, that’s a snub
+    if(alliesAvailable) penalizeNonAllyDuel(voteWinner, opponent, true);
   }else{
-    opponent = weightedChoice(candidates, p => 1); // neutral
+    opponent = weightedChoice(candidates, p => relFactor(voteWinner, p));
     reason = 'makes a neutral pick';
   }
   log(`${voteWinner} chooses to duel ${opponent} — ${reason}.`);
 
-  // Penalize for snubbing allies
-  penalizeNonAllyDuel(voteWinner, opponent, alliesAvailable);
-
-  // Duel outcome — logistic on Challenge
+  // Duel outcome — logistic on Challenge (no resentment on loss)
   const pWin = duelWinProb(voteWinner, opponent);
   const duelWinner = Math.random() < pWin ? voteWinner : opponent;
   keys[duelWinner].push('P2');
   log(`${duelWinner} wins the duel and earns a Phase 2 key.`);
 
-  evolveAlliancesMidgame();
+  // Relationship‑driven alliance maintenance
+  considerAllianceKicks(voteWinner);
+  maybeFormNewAllianceFromBonds();
+
   updateProgress();
+  renderRelsLive();
+  updateAlliances();
   round++;
 }
 
@@ -603,11 +765,13 @@ function endPhase2(){
   players = advancing;
   log(`Phase 2 complete. Eliminated: ${phaseOut.join(', ')}`);
   renderMasterVoteTable();
+  renderRelsLive();
+  updateAlliances();
   round = 1; phase = 3; phase3Step = 0;
   nextRound();
 }
 
-/* ====== Phase 3 (Two-step) ====== */
+/* ====== Phase 3 (Two-step + 4-way tie rule) ====== */
 let p3_voteWinner = null;
 let p3_chosenAlly = null;
 let p3_duelists = [];
@@ -619,16 +783,42 @@ function runPhase3(){
     const votePairs = votePairsRaw.map(([v,to])=>{
       if(v===to){
         const choices = players.filter(p=>p!==v);
-        // use jittered social weighting for the corrected pick
         return [v, weightedChoice(choices, choices.map(c=>{
           const social = (stats[c]?.social ?? 8);
           const jitter = VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN);
-          return Math.pow(social, ALPHA_SOCIAL) * jitter;
+          return Math.pow(social, ALPHA_SOCIAL) * jitter * relFactor(v,c);
         }))];
       }
       return [v,to];
     });
-    let [voteWinner] = tally(votePairs, players);
+    const [voteWinner, tied, counts] = (()=>{
+      const [w, t, c] = tally(votePairs, players);
+      return [w, t, c];
+    })();
+
+    // Check 4-way tie at F4
+    if(players.length===4){
+      const votesEach = Object.values((()=>{ const c={}; players.forEach(p=>c[p]=0); votePairs.forEach(([_,to])=>c[to]++); return c; })());
+      const allEqual = votesEach.every(v=>v===votesEach[0]);
+      if(allEqual){
+        log(`Final 4 vote is a four‑way tie! All four compete; top three advance.`);
+        // 4-player challenge weighted by Challenge
+        const perf = players.map(p=>({p, score: (stats[p]?.challenge ?? 8) * (0.8 + Math.random()*0.4)}));
+        perf.sort((a,b)=>b.score-a.score);
+        const advancing = perf.slice(0,3).map(x=>x.p);
+        const fourth = perf[3].p;
+        finalists = advancing.slice();
+        jury.push({name: fourth, phase:3});
+        if(!eliminated.includes(fourth)) eliminated.push(fourth);
+        log(`Challenge order: ${perf.map(x=>x.p).join(' > ')}`);
+        log(`${fourth} finishes last and is eliminated; the others advance to the finale.`);
+        updateProgress();
+        renderRelsLive();
+        phase = 4;
+        return;
+      }
+    }
+
     p3_voteWinner = voteWinner;
     log(`${voteWinner} wins the vote and becomes a finalist.`);
 
@@ -636,7 +826,8 @@ function runPhase3(){
     const available = players.filter(p=>p!==voteWinner);
     const allyOpts = available.filter(p=>inAlliance(p, voteWinner));
     const pool = (allyOpts.length ? allyOpts : available);
-    p3_chosenAlly = weightedChoice(pool, p => (stats[p]?.social ?? 8) + 0.1*(16 - (stats[p]?.challenge ?? 8)));
+    p3_chosenAlly = weightedChoice(pool, p => (stats[p]?.social ?? 8) + 0.1*(16 - (stats[p]?.challenge ?? 8)) * relFactor(voteWinner,p));
+    if(inAlliance(voteWinner, p3_chosenAlly)) incRel(voteWinner, p3_chosenAlly, +2);
 
     addVoteColumn(`P3 Vote`, 'P3', 1, knownVoters, votePairs, voteWinner, null);
 
@@ -644,6 +835,7 @@ function runPhase3(){
     log(`${voteWinner} selects ${p3_chosenAlly} to join them. Next: ${p3_duelists[0]} vs ${p3_duelists[1]} for the last spot. Click Next to resolve.`);
     finalists = [p3_voteWinner, p3_chosenAlly];
     updateProgress();
+    renderRelsLive();
     phase3Step = 1;
     return;
   }
@@ -658,6 +850,7 @@ function runPhase3(){
     jury.push({name:duelLoser, phase:3});
     log(`${duelWinner} wins the final duel. ${duelLoser} is eliminated and joins the jury.`);
     updateProgress();
+    renderRelsLive();
 
     phase = 4;
     phase3Step = 0;
@@ -692,7 +885,7 @@ function runFinale(){
 
       finaleState.chosenVaults = pickUniqueVaultsForFinalists(expect);
 
-      // Distribute exactly 16 jury keys (closer by default, blowouts for undeniable games)
+      // Distribute exactly 16 jury keys (closer by default; blowouts for undeniable games)
       finaleState.juryMatrix = distributeJuryKeysExact16(finalists, jury, finaleState.finalistKeys);
     }
 
@@ -752,7 +945,6 @@ function pickUniqueVaultsForFinalists(expect){
 
 /* Jury distribution: EXACTLY 16 keys, closer by default; blowouts only for undeniable games */
 function distributeJuryKeysExact16(finalists, jury, finalistKeys){
-  // Build the cap pool
   const capPool = [];
   jury.forEach(j=>{
     const cap = j.phase===1?1:j.phase===2?2:4;
@@ -764,7 +956,6 @@ function distributeJuryKeysExact16(finalists, jury, finalistKeys){
   const jm = {};
   jury.forEach(j=>{ jm[j.name] = Object.fromEntries(finalists.map(f=>[f,0])) });
 
-  // Strength = alliances + stronger Social weight
   function allianceSupportForFinalist(f){
     let s = 0;
     jury.forEach(j=>{
@@ -780,14 +971,12 @@ function distributeJuryKeysExact16(finalists, jury, finalistKeys){
     baseStrength[f] = a + 0.6 * soc;
   });
 
-  // Disparity-aware softmax blended toward uniform
   function normalizeProbs(strength){
     const vals = finalists.map(f=>strength[f]);
     const sorted = vals.slice().sort((x,y)=>y-x);
     const top = sorted[0], second = sorted[1] ?? sorted[0];
-    const disparity = (top - second) / (top || 1); // 0..1
-
-    const T = disparity >= 0.5 ? 0.55 : disparity >= 0.25 ? 0.7 : 0.9; // lower T => more skew allowed
+    const disparity = (top - second) / (top || 1);
+    const T = disparity >= 0.5 ? 0.55 : disparity >= 0.25 ? 0.7 : 0.9;
     const exp = {};
     let sum = 0;
     finalists.forEach(f=>{
@@ -796,23 +985,16 @@ function distributeJuryKeysExact16(finalists, jury, finalistKeys){
     });
     let probs = {};
     finalists.forEach(f=>{ probs[f] = exp[f] / sum; });
-
     const uniform = 1 / finalists.length;
-    const lambda = disparity >= 0.5 ? 0.05 : disparity >= 0.25 ? 0.18 : 0.35; // blend toward closer results
-    finalists.forEach(f=>{
-      probs[f] = (1 - lambda)*probs[f] + lambda*uniform;
-    });
+    const lambda = disparity >= 0.5 ? 0.05 : disparity >= 0.25 ? 0.18 : 0.35;
+    finalists.forEach(f=>{ probs[f] = (1 - lambda)*probs[f] + lambda*uniform; });
     return probs;
   }
-
   const baseProbs = normalizeProbs(baseStrength);
 
-  // Allocate keys with mild juror-specific tilt
   draws.forEach(jName=>{
     const j = jury.find(x=>x.name===jName);
     let jurorProbs = Object.assign({}, baseProbs);
-
-    // If allied with exactly one finalist, nudge +15%
     const allied = finalists.filter(f=>inAlliance(j.name, f));
     if(allied.length === 1){
       const fav = allied[0];
@@ -820,7 +1002,6 @@ function distributeJuryKeysExact16(finalists, jury, finalistKeys){
       let s = 0; finalists.forEach(f=> s += jurorProbs[f]);
       finalists.forEach(f=> jurorProbs[f] /= s);
     }
-
     const fTarget = weightedChoice(finalists, f => jurorProbs[f]);
     jm[jName][fTarget] += 1;
     finalistKeys[fTarget] += 1;
@@ -850,11 +1031,10 @@ function displayJuryMatrix(matrix){
   area.innerHTML = html;
 }
 
-/* ====== Build/refresh stats table on input changes ====== */
+/* ====== Build/refresh stats & rel table on input changes ====== */
 document.getElementById('playerInput').addEventListener('input', ()=>{
-  if(!gameStarted) buildStatsTable();
+  if(!gameStarted) { buildStatsTable(); renderRelsLive(); }
 });
-
 </script>
 </body>
 </html>
