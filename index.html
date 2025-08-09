@@ -40,7 +40,7 @@
     .table-scroll{overflow:auto;max-width:100%}
     .stats-input{width:70px}
     .rowwrap{display:flex;gap:18px;flex-wrap:wrap}
-    .third{flex:1 1 340px}
+    .third{flex:1 1 240px}
   </style>
 </head>
 <body>
@@ -63,6 +63,7 @@
         <button id="presetBalanced" class="third">Balanced</button>
         <button id="presetSocial" class="third">Social‑heavy</button>
         <button id="presetChallenge" class="third">Challenge‑heavy</button>
+        <button id="presetRandom" class="third">Randomize All</button>
       </div>
       <button id="applyStats">Apply Stats</button>
       <div class="hint">Range: 1–15. Defaults to 8/8. Stats lock after you click Start Game.</div>
@@ -155,9 +156,10 @@ const statsBox = document.getElementById('statsBox');
 const statsTableDiv = document.getElementById('statsTable');
 
 document.getElementById('applyStats').onclick = applyStatsFromInputs;
-document.getElementById('presetBalanced').onclick = ()=>presetStats('balanced');
-document.getElementById('presetSocial').onclick   = ()=>presetStats('social');
-document.getElementById('presetChallenge').onclick= ()=>presetStats('challenge');
+document.getElementById('presetBalanced').onclick  = ()=>presetStats('balanced');
+document.getElementById('presetSocial').onclick    = ()=>presetStats('social');
+document.getElementById('presetChallenge').onclick = ()=>presetStats('challenge');
+document.getElementById('presetRandom').onclick    = ()=>presetStats('random');
 
 startBtn.onclick = startGame;
 nextBtn.onclick  = nextRound;
@@ -286,9 +288,13 @@ function presetStats(which){
   const names = getPlist();
   names.forEach(n=>{
     if(!stats[n]) stats[n] = {social:8, challenge:8};
-    if(which==='balanced'){ stats[n].social = 8; stats[n].challenge = 8; }
-    if(which==='social'){ stats[n].social = 12; stats[n].challenge = 8; }
-    if(which==='challenge'){ stats[n].social = 8; stats[n].challenge = 12; }
+    if(which==='balanced'){  stats[n].social = 8;  stats[n].challenge = 8; }
+    if(which==='social'){    stats[n].social = 12; stats[n].challenge = 8; }
+    if(which==='challenge'){ stats[n].social = 8;  stats[n].challenge = 12; }
+    if(which==='random'){
+      stats[n].social    = Math.floor(1 + Math.random()*15);     // 1–15
+      stats[n].challenge = Math.floor(1 + Math.random()*15);     // 1–15
+    }
   });
   buildStatsTable();
 }
@@ -686,7 +692,7 @@ function runFinale(){
 
       finaleState.chosenVaults = pickUniqueVaultsForFinalists(expect);
 
-      // Distribute exactly 16 jury keys with alliance + Social tilt
+      // Distribute exactly 16 jury keys (closer by default, blowouts for undeniable games)
       finaleState.juryMatrix = distributeJuryKeysExact16(finalists, jury, finaleState.finalistKeys);
     }
 
@@ -744,8 +750,9 @@ function pickUniqueVaultsForFinalists(expect){
   return picked;
 }
 
-/* Jury distribution to total EXACTLY 16 keys with per-juror caps, alliance + Social tilt */
+/* Jury distribution: EXACTLY 16 keys, closer by default; blowouts only for undeniable games */
 function distributeJuryKeysExact16(finalists, jury, finalistKeys){
+  // Build the cap pool
   const capPool = [];
   jury.forEach(j=>{
     const cap = j.phase===1?1:j.phase===2?2:4;
@@ -757,32 +764,66 @@ function distributeJuryKeysExact16(finalists, jury, finalistKeys){
   const jm = {};
   jury.forEach(j=>{ jm[j.name] = Object.fromEntries(finalists.map(f=>[f,0])) });
 
-  function expectedSupport(f){
+  // Strength = alliances + stronger Social weight
+  function allianceSupportForFinalist(f){
     let s = 0;
     jury.forEach(j=>{
       const cap = j.phase===1?1:j.phase===2?2:4;
       if(inAlliance(j.name, f)) s += cap;
     });
-    // Social tilt
-    s += 0.4*(stats[f]?.social ?? 8);
     return s;
   }
+  const baseStrength = {};
+  finalists.forEach(f=>{
+    const a = allianceSupportForFinalist(f);
+    const soc = (stats[f]?.social ?? 8);
+    baseStrength[f] = a + 0.6 * soc;
+  });
 
+  // Disparity-aware softmax blended toward uniform
+  function normalizeProbs(strength){
+    const vals = finalists.map(f=>strength[f]);
+    const sorted = vals.slice().sort((x,y)=>y-x);
+    const top = sorted[0], second = sorted[1] ?? sorted[0];
+    const disparity = (top - second) / (top || 1); // 0..1
+
+    const T = disparity >= 0.5 ? 0.55 : disparity >= 0.25 ? 0.7 : 0.9; // lower T => more skew allowed
+    const exp = {};
+    let sum = 0;
+    finalists.forEach(f=>{
+      const e = Math.exp((strength[f]) / T);
+      exp[f] = e; sum += e;
+    });
+    let probs = {};
+    finalists.forEach(f=>{ probs[f] = exp[f] / sum; });
+
+    const uniform = 1 / finalists.length;
+    const lambda = disparity >= 0.5 ? 0.05 : disparity >= 0.25 ? 0.18 : 0.35; // blend toward closer results
+    finalists.forEach(f=>{
+      probs[f] = (1 - lambda)*probs[f] + lambda*uniform;
+    });
+    return probs;
+  }
+
+  const baseProbs = normalizeProbs(baseStrength);
+
+  // Allocate keys with mild juror-specific tilt
   draws.forEach(jName=>{
     const j = jury.find(x=>x.name===jName);
-    const shared = finalists.filter(f=>inAlliance(j.name, f));
-    let target;
-    if(shared.length === 1){
-      target = shared[0];
-    }else if(shared.length === 2){
-      target = Math.random()<0.6 ? finalists.slice().sort((a,b)=>expectedSupport(b)-expectedSupport(a))[0]
-                                 : finalists[Math.floor(Math.random()*finalists.length)];
-    }else{
-      target = Math.random()<0.65 ? finalists.slice().sort((a,b)=>expectedSupport(b)-expectedSupport(a))[0]
-                                  : finalists[Math.floor(Math.random()*finalists.length)];
+    let jurorProbs = Object.assign({}, baseProbs);
+
+    // If allied with exactly one finalist, nudge +15%
+    const allied = finalists.filter(f=>inAlliance(j.name, f));
+    if(allied.length === 1){
+      const fav = allied[0];
+      jurorProbs[fav] *= 1.15;
+      let s = 0; finalists.forEach(f=> s += jurorProbs[f]);
+      finalists.forEach(f=> jurorProbs[f] /= s);
     }
-    jm[jName][target] += 1;
-    finalistKeys[target] += 1;
+
+    const fTarget = weightedChoice(finalists, f => jurorProbs[f]);
+    jm[jName][fTarget] += 1;
+    finalistKeys[fTarget] += 1;
   });
 
   return jm;
