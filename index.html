@@ -59,7 +59,13 @@
       <button id="openSeasonRecap" style="display:none;">Season Recap</button>
       <button id="openStats" style="display:none;">Post‑Season Stats</button>
     </div>
-    <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote, then duel) → Finale (Jury → Open → Winner). F4: 2‑way tie = tied duel for last spot; 4‑way tie = top‑3 challenge.</div>
+    <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote, then duel) → Finale (Jury → Open → Winner). F4: 2‑way tie = tied duel; 4‑way tie = top‑3 challenge.</div>
+  </div>
+
+  <!-- Alliances panel (added back) -->
+  <div class="box" id="alliancesBox">
+    <h2>Alliances</h2>
+    <div id="alliancesList"></div>
   </div>
 
   <div class="rowwrap">
@@ -115,7 +121,7 @@
   <div class="box">
     <h2>Voting Matrix (Season)</h2>
     <div id="votingMatrix"></div>
-    <div class="hint">LOCKPICK appears in the voter’s cell if used that round. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
+    <div class="hint">LOCKPICK shows in the voter’s cell if used. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
   </div>
 
   <div class="box">
@@ -390,7 +396,15 @@ function considerAllianceKicks(p){ for(const [name,list] of Object.entries(allia
 function maybeFormNewAllianceFromBonds(){ const free=players.slice(); for(let i=0;i<free.length;i++) for(let j=i+1;j<free.length;j++){ const a=free[i],b=free[j]; if(getRel(a,b)>=4 && !inAlliance(a,b) && Math.random()<0.25){ const name=pickNewAllianceName(); alliances[name]=[a,b]; const third=free.find(x=>x!==a&&x!==b && getRel(a,x)>=3 && getRel(b,x)>=3); if(third) alliances[name].push(third); queueRelUpdate(`New Alliance ${name} forms via strong bonds: ${alliances[name].join(', ')}`); updateAlliances(); return; } } }
 function penalizeNonAllyDuel(decider,opponent,alliesAvail){ if(alliesAvail && !inAlliance(decider,opponent)){ const allySet=new Set(); for(const list of Object.values(alliances)){ if(list.includes(decider)) list.forEach(x=>{ if(x!==decider) allySet.add(x) }); } allySet.forEach(ally=>incRel(decider,ally,-2)); } }
 function pickNewAllianceName(){ const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''); for(const c of A){ if(!alliances[c]) return c; } return 'Z'+Math.floor(Math.random()*99); }
-function updateAlliances(){ const box=document.getElementById('alliancesList'); box.innerHTML=''; Object.entries(alliances).forEach(([n,m])=>{ const vis=m.filter(x=>initialOrder.includes(x)); if(vis.length) box.innerHTML+=`<strong>Alliance ${n}</strong>: ${vis.join(', ')}<br/>`; }); }
+function updateAlliances(){
+  const box=document.getElementById('alliancesList');
+  if(!box) return; // safety if panel missing/hidden
+  box.innerHTML='';
+  Object.entries(alliances).forEach(([n,m])=>{
+    const vis=m.filter(x=>initialOrder.includes(x));
+    if(vis.length) box.innerHTML+=`<strong>Alliance ${n}</strong>: ${vis.join(', ')}<br/>`;
+  });
+}
 
 /* ====== Progress ====== */
 function updateProgress(){
@@ -508,7 +522,7 @@ function runPhase3(){
       const vals=Object.values(cm); const maxV=Math.max(...vals); const tiedTop=Object.keys(cm).filter(p=>cm[p]===maxV);
       if(new Set(vals).size===1){
         log(`Final 4 vote is a four‑way tie! All four compete; top three advance.`);
-        const perf=players.map(p=>({p,score:(stats[p]?.challenge??8)*(0.8+Math.random()*0.4)})).sort((a,b)=>b.score-a.score);
+        const perf=players.map(p=>({p,score:(stats[p]?.challenge??8)*(0.8+Math.random()*0.4)})).sort((a,b)=>b.score-a.score;
         const advancing=perf.slice(0,3).map(x=>x.p); const fourth=perf[3].p;
         finalists=advancing.slice(); jury.push({name:fourth,phase:3}); if(!eliminated.includes(fourth)) eliminated.push(fourth);
         log(`Challenge order: ${perf.map(x=>x.p).join(' > ')}`); log(`${fourth} finishes last and is eliminated; the others advance.`);
