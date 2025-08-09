@@ -21,7 +21,7 @@
     body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);padding:20px;margin:0}
     h1{margin:0 0 16px;text-align:center}
     h2{margin:0 0 10px;font-size:18px;color:var(--text)}
-    textarea,button,input{width:100%;padding:10px;margin-top:10px;font-size:15px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
+    textarea,button,input,select{width:100%;padding:10px;margin-top:10px;font-size:15px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
     button{cursor:pointer}
     button:hover{background:var(--muted)}
     .box{background:var(--panel);padding:15px;border-radius:12px;box-shadow:0 0 0 1px var(--border);margin-bottom:18px}
@@ -68,14 +68,23 @@
       <div class="hint">Range: 1–15. Defaults to 8/8. Stats lock after you click Start Game.</div>
     </div>
 
+    <!-- NEW: Player-focused relationships editor -->
     <div class="box third" id="relsPreBox">
       <h2>Relationships (Preseason)</h2>
-      <div class="hint">Optional. One pair per line as <code>Name1,Name2,score</code>. Score −5..+5 (bond &gt; 0, feud &lt; 0). You can also click Randomize Mild.</div>
-      <textarea id="relInput" rows="10" placeholder="Alice,Bob,3&#10;Cara,Dee,-2"></textarea>
-      <div class="rowwrap">
-        <button id="relRandom" class="third">Randomize Mild</button>
-        <button id="relClear" class="third">Clear</button>
-        <button id="relApply" class="third">Apply Relationships</button>
+      <div class="hint">Pick a focus player, then set their relationship with everyone else (−5..+5). Bonds &gt; 0, feuds &lt; 0.</div>
+      <div class="rowwrap" style="align-items:center">
+        <label class="muted">Focus Player</label>
+        <select id="relFocus"></select>
+      </div>
+      <div id="relEditor"></div>
+      <div class="rowwrap" style="margin-top:8px">
+        <button id="relSave" class="third">Save</button>
+        <button id="relRandFocus" class="third">Randomize Mild (Focus)</button>
+        <button id="relClearFocus" class="third">Clear (Focus)</button>
+      </div>
+      <div class="rowwrap" style="margin-top:8px">
+        <button id="relRandAll" class="third">Randomize Mild (All)</button>
+        <button id="relClearAll" class="third">Clear (All)</button>
       </div>
     </div>
 
@@ -103,7 +112,7 @@
   <div class="box">
     <h2>Voting Matrix (Season)</h2>
     <div id="votingMatrix"></div>
-    <div class="hint">Plain text. LOCKPICK appears in the voter’s cell if used that round. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
+    <div class="hint">LOCKPICK appears in the voter’s cell if used that round. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
   </div>
 
   <div class="box">
@@ -177,17 +186,6 @@ const roundsBox= document.getElementById('roundEvents');
 const statsBox = document.getElementById('statsBox');
 const relsPreBox = document.getElementById('relsPreBox');
 const statsTableDiv = document.getElementById('statsTable');
-const relInput = document.getElementById('relInput');
-
-document.getElementById('applyStats').onclick = applyStatsFromInputs;
-document.getElementById('presetBalanced').onclick  = ()=>presetStats('balanced');
-document.getElementById('presetSocial').onclick    = ()=>presetStats('social');
-document.getElementById('presetChallenge').onclick = ()=>presetStats('challenge');
-document.getElementById('presetRandom').onclick    = ()=>presetStats('random');
-
-document.getElementById('relRandom').onclick = randomizeRelationshipsMild;
-document.getElementById('relClear').onclick  = ()=>{ relInput.value=''; rel = {}; renderRelsLive(); };
-document.getElementById('relApply').onclick  = applyRelationshipsFromInput;
 
 startBtn.onclick = startGame;
 nextBtn.onclick  = nextRound;
@@ -249,52 +247,13 @@ function relFactor(voter, target){
   return clamp(rf, REL_MIN_FACTOR, 2); // cap at 2x to be safe
 }
 
-/* ====== Start / Next / Reset ====== */
-function startGame(){
-  if(gameStarted) return;
-  const input = document.getElementById('playerInput').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
-  if(input.length !== 12){ alert('Please enter exactly 12 players.'); return }
-  gameStarted = true;
-
-  players = input;
-  initialOrder = input.slice();
-  knownVoters = input.slice();
-  players.forEach(p => keys[p] = []);
-  players.forEach(p => { if(!stats[p]) stats[p] = {social:8, challenge:8}; if(!rel[p]) rel[p]={}; });
-
-  // Lock the preseason UIs
-  statsBox.style.display = 'none';
-  relsPreBox.style.display = 'none';
-
-  generateAlliances();
-  updateAlliances();
-  updateProgress();
-  renderMasterVoteTable();
-  renderRelsLive();
-
-  log('Phase 1 begins: The Key Quest starts now.');
-  startBtn.style.display = 'none';
-  nextBtn.style.display = 'inline-block';
-  nextBtn.textContent = 'Next';
-  nextBtn.onclick = nextRound;
-
-  nextRound();
-}
-
-function nextRound(){
-  clearLog();
-  if(phase === 1) runPhase1();
-  else if(phase === 2) runPhase2();
-  else if(phase === 3) runPhase3();
-  else if(phase === 4) runFinale();
-}
-
-function endGameUI(){
-  nextBtn.textContent = 'Simulate Again';
-  nextBtn.onclick = ()=>location.reload();
-}
-
 /* ====== Stats UI ====== */
+document.getElementById('applyStats').onclick = applyStatsFromInputs;
+document.getElementById('presetBalanced').onclick  = ()=>presetStats('balanced');
+document.getElementById('presetSocial').onclick    = ()=>presetStats('social');
+document.getElementById('presetChallenge').onclick = ()=>presetStats('challenge');
+document.getElementById('presetRandom').onclick    = ()=>presetStats('random');
+
 function buildStatsTable(){
   const vals = getPlist();
   let html = `<div class="table-scroll"><table>
@@ -341,55 +300,99 @@ function presetStats(which){
   buildStatsTable();
 }
 
-/* ====== Relationships UI (Preseason) ====== */
-function randomizeRelationshipsMild(){
+/* ====== Preseason Relationship Editor (player-focused) ====== */
+const relFocusSel = document.getElementById('relFocus');
+const relEditorDiv = document.getElementById('relEditor');
+document.getElementById('relSave').onclick = saveRelFocus;
+document.getElementById('relRandFocus').onclick = randRelFocus;
+document.getElementById('relClearFocus').onclick = clearRelFocus;
+document.getElementById('relRandAll').onclick = randRelAll;
+document.getElementById('relClearAll').onclick = clearRelAll;
+
+function buildRelFocusList(){
   const names = getPlist();
-  // mild spread -2..+2
+  relFocusSel.innerHTML = names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  if(names.length) renderRelEditorFor(names[0]);
+}
+relFocusSel?.addEventListener('change', e=>{
+  renderRelEditorFor(e.target.value);
+});
+function renderRelEditorFor(focus){
+  const names = getPlist().filter(n=>n!==focus);
+  let html = `<div class="table-scroll"><table>
+    <tr><th>Player</th><th>Score (−5..+5)</th></tr>`;
+  names.forEach(n=>{
+    const v = getRel(focus, n);
+    html += `<tr>
+      <td>${n}</td>
+      <td><input type="number" class="rel-spin" data-target="${n}" min="-5" max="5" step="1" value="${v}"></td>
+    </tr>`;
+  });
+  html += `</table></div>`;
+  relEditorDiv.innerHTML = html;
+}
+function saveRelFocus(){
+  const focus = relFocusSel.value;
+  relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{
+    const target = inp.getAttribute('data-target');
+    const val = clamp(parseInt(inp.value||'0',10), -5, 5);
+    setRel(focus, target, val);
+  });
+  log(`Saved relationships for ${focus}.`);
+  renderRelsLive();
+}
+function randRelFocus(){
+  const focus = relFocusSel.value;
+  relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{
+    const target = inp.getAttribute('data-target');
+    const val = Math.floor(-2 + Math.random()*5); // −2..+2
+    setRel(focus, target, val);
+    inp.value = val;
+  });
+  log(`Randomized (mild) relationships for ${focus}.`);
+  renderRelsLive();
+}
+function clearRelFocus(){
+  const focus = relFocusSel.value;
+  relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{
+    const target = inp.getAttribute('data-target');
+    setRel(focus, target, 0);
+    inp.value = 0;
+  });
+  log(`Cleared relationships for ${focus}.`);
+  renderRelsLive();
+}
+function randRelAll(){
+  const names = getPlist();
   names.forEach(a=>{
     names.forEach(b=>{
       if(a>=b) return;
-      const v = Math.floor(-2 + Math.random()*5); // -2..+2
-      if(v!==0) setRel(a,b,v);
+      const v = Math.floor(-2 + Math.random()*5); // −2..+2
+      setRel(a,b,v);
     });
   });
-  relInput.value = serializeRelPairs();
-  log('Preseason relationships randomized (mild).');
+  log('Randomized (mild) relationships for all players.');
+  renderRelEditorFor(relFocusSel.value);
   renderRelsLive();
 }
-function applyRelationshipsFromInput(){
-  const lines = relInput.value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
-  for(const line of lines){
-    const m = line.split(',').map(s=>s.trim());
-    if(m.length!==3) continue;
-    const [a,b,sv] = m;
-    const val = clamp(parseInt(sv,10), -5, 5);
-    if(a && b) setRel(a,b,val);
-  }
-  log('Preseason relationships applied.');
-  renderRelsLive();
-}
-function serializeRelPairs(){
+function clearRelAll(){
   const names = getPlist();
-  const seen = new Set();
-  const out = [];
   names.forEach(a=>{
     names.forEach(b=>{
-      if(a===b) return;
-      const key = [a,b].sort().join('|');
-      if(seen.has(key)) return;
-      const v = getRel(a,b);
-      if(v!==0) out.push(`${a},${b},${v}`);
-      seen.add(key);
+      if(a>=b) return;
+      setRel(a,b,0);
     });
   });
-  return out.join('\n');
+  log('Cleared all preseason relationships.');
+  renderRelEditorFor(relFocusSel.value);
+  renderRelsLive();
 }
 
 /* Show top bonds/rivalries live */
 function renderRelsLive(){
   const wrap = document.getElementById('relsLive');
-  if(!players.length && !Object.keys(stats).length){ wrap.innerHTML=''; return; }
   const names = players.length ? players : getPlist();
+  if(!names.length){ wrap.innerHTML = ''; return; }
   const pairs = [];
   const seen = new Set();
   names.forEach(a=>{
@@ -416,8 +419,63 @@ function renderRelsLive(){
   wrap.innerHTML = html;
 }
 
-/* Render initial empty stats table */
+/* Render initial empty tables */
 buildStatsTable();
+buildRelFocusList();
+
+/* Keep preseason editors in sync with names typed */
+document.getElementById('playerInput').addEventListener('input', ()=>{
+  if(!gameStarted){
+    buildStatsTable();
+    buildRelFocusList();
+    renderRelsLive();
+  }
+});
+
+/* ====== Start / Next / Reset ====== */
+function startGame(){
+  if(gameStarted) return;
+  const input = document.getElementById('playerInput').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
+  if(input.length !== 12){ alert('Please enter exactly 12 players.'); return }
+  gameStarted = true;
+
+  players = input;
+  initialOrder = input.slice();
+  knownVoters = input.slice();
+  players.forEach(p => keys[p] = []);
+  players.forEach(p => { if(!stats[p]) stats[p] = {social:8, challenge:8}; if(!rel[p]) rel[p]={}; });
+
+  // Lock the preseason UIs
+  statsBox.style.display = 'none';
+  relsPreBox.style.display = 'none';
+
+  generateAlliances();
+  updateAlliances();
+  updateProgress();
+  renderMasterVoteTable();
+  renderRelsLive();
+
+  log('Phase 1 begins: The Key Quest starts now.');
+  startBtn.style.display = 'none';
+  nextBtn.style.display = 'inline-block';
+  nextBtn.textContent = 'Next';
+  nextBtn.onclick = nextRound;
+
+  nextRound();
+}
+
+function nextRound(){
+  clearLog();
+  if(phase === 1) runPhase1();
+  else if(phase === 2) runPhase2();
+  else if(phase === 3) runPhase3();
+  else if(phase === 4) runFinale();
+}
+
+function endGameUI(){
+  nextBtn.textContent = 'Simulate Again';
+  nextBtn.onclick = ()=>location.reload();
+}
 
 /* ====== Voting Core (secret, relationships-weighted) ====== */
 function simulateVote(voters, eligible){
@@ -457,13 +515,13 @@ function addVoteColumn(label, phaseTag, roundNo, voters, votePairs, result, lock
   voteColumns.push({label, phaseTag, roundNo, result, values});
   renderMasterVoteTable();
 }
-
 function renderMasterVoteTable(){
   const wrap = document.getElementById('votingMatrix');
   let html = `<div class="table-scroll"><table><thead><tr><th>Voter</th>`;
   voteColumns.forEach(c => { html += `<th>${c.label}</th>`; });
   html += `</tr></thead><tbody>`;
 
+  // ordering: active/finalists → P3 elim → P2 elim → P1 elim
   const activeRows = players.slice();
   const elimP3 = eliminated.filter(n=>getElimPhase(n)===3);
   const elimP2 = eliminated.filter(n=>getElimPhase(n)===2);
@@ -482,9 +540,12 @@ function renderMasterVoteTable(){
   elimP2.forEach(renderRow);
   elimP1.forEach(renderRow);
 
+  // result row
   html += `<tr><th>Result</th>`;
   voteColumns.forEach(c => { html += `<th>${c.result || ''}</th>`; });
-  html += `</tr></tbody></table></div>`;
+  html += `</tr>`;
+
+  html += `</tbody></table></div>`;
   wrap.innerHTML = html;
 }
 
@@ -506,14 +567,12 @@ function generateAlliances(){
     }
   });
 }
-
 function averageRelWithAlliance(p, allianceName){
   const members = alliances[allianceName].filter(x=>x!==p);
   if(!members.length) return 0;
   const sum = members.reduce((a,b)=>a+getRel(p,b),0);
   return sum / members.length;
 }
-
 function considerAllianceKicks(p){
   // If average relationship with any alliance is < -2, 50% chance to be removed
   for(const [name, list] of Object.entries(alliances)){
@@ -525,9 +584,8 @@ function considerAllianceKicks(p){
   }
   updateAlliances();
 }
-
 function maybeFormNewAllianceFromBonds(){
-  // If two non-teammates have mutual bond >= 4, small chance to form a new alliance
+  // two players with mutual bond >= 4 can form a new alliance
   const free = players.slice();
   for(let i=0;i<free.length;i++){
     for(let j=i+1;j<free.length;j++){
@@ -535,7 +593,6 @@ function maybeFormNewAllianceFromBonds(){
       if(getRel(a,b) >= 4 && !inAlliance(a,b) && Math.random()<0.25){
         const name = pickNewAllianceName();
         alliances[name] = [a,b];
-        // Optionally add a third bonded member
         const third = free.find(x=>x!==a&&x!==b && getRel(a,x)>=3 && getRel(b,x)>=3);
         if(third) alliances[name].push(third);
         log(`New Alliance ${name} forms via strong bonds: ${alliances[name].join(', ')}`);
@@ -545,12 +602,9 @@ function maybeFormNewAllianceFromBonds(){
     }
   }
 }
-
 function penalizeNonAllyDuel(decider, opponent, alliesAvailable){
-  // Our rule: picking non‑ally when allies were available is anti‑alliance → feud up
+  // picking non‑ally when allies were available is anti‑alliance → feud up across their allies
   if(alliesAvailable && !inAlliance(decider, opponent)){
-    const decAllies = Object.values(alliances).flatMap(([..._])=>[]);
-    // Gather all allies of decider in any alliance
     const allySet = new Set();
     for(const list of Object.values(alliances)){
       if(list.includes(decider)){
@@ -562,7 +616,6 @@ function penalizeNonAllyDuel(decider, opponent, alliesAvailable){
     considerAllianceKicks(decider);
   }
 }
-
 function pickNewAllianceName(){
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   for(const c of alphabet){
@@ -656,7 +709,6 @@ function runPhase1(){
     log(`No challenge key awarded.`);
   }
 
-  // Natural alliance shifts from relationships
   maybeFormNewAllianceFromBonds();
 
   updateProgress();
@@ -726,7 +778,7 @@ function runPhase2(){
     // Keep key in alliance: pick an ally (loyal move). Slightly prefer not-the-strongest ally.
     opponent = weightedChoice(allies, p => 1/Math.max(1,(stats[p]?.challenge ?? 8)) * relFactor(voteWinner, p));
     reason = 'keeps the key within their alliance';
-    incRel(voteWinner, opponent, +2); // bonding for picking ally to duel
+    incRel(voteWinner, opponent, +2); // bond for picking ally to duel
   }else if(nonAllies.length){
     // Beat them: prefer someone weaker; relationships still nudge
     opponent = weightedChoice(nonAllies, p => Math.pow(1/Math.max(1,(stats[p]?.challenge ?? 8)), GAMMA_BEATABLE) * relFactor(voteWinner, p));
@@ -745,7 +797,6 @@ function runPhase2(){
   keys[duelWinner].push('P2');
   log(`${duelWinner} wins the duel and earns a Phase 2 key.`);
 
-  // Relationship‑driven alliance maintenance
   considerAllianceKicks(voteWinner);
   maybeFormNewAllianceFromBonds();
 
@@ -798,8 +849,9 @@ function runPhase3(){
 
     // Check 4-way tie at F4
     if(players.length===4){
-      const votesEach = Object.values((()=>{ const c={}; players.forEach(p=>c[p]=0); votePairs.forEach(([_,to])=>c[to]++); return c; })());
-      const allEqual = votesEach.every(v=>v===votesEach[0]);
+      const countsMap = {}; players.forEach(p=>countsMap[p]=0); votePairs.forEach(([_,to])=>countsMap[to]++);
+      const vals = Object.values(countsMap);
+      const allEqual = vals.every(v=>v===vals[0]);
       if(allEqual){
         log(`Final 4 vote is a four‑way tie! All four compete; top three advance.`);
         // 4-player challenge weighted by Challenge
@@ -822,11 +874,11 @@ function runPhase3(){
     p3_voteWinner = voteWinner;
     log(`${voteWinner} wins the vote and becomes a finalist.`);
 
-    // Ally pick prefers high Social among allies; small tiebreak by lower Challenge risk
+    // Ally pick prefers high Social among allies; tiny tiebreak by lower Challenge risk
     const available = players.filter(p=>p!==voteWinner);
     const allyOpts = available.filter(p=>inAlliance(p, voteWinner));
     const pool = (allyOpts.length ? allyOpts : available);
-    p3_chosenAlly = weightedChoice(pool, p => (stats[p]?.social ?? 8) + 0.1*(16 - (stats[p]?.challenge ?? 8)) * relFactor(voteWinner,p));
+    p3_chosenAlly = weightedChoice(pool, p => ((stats[p]?.social ?? 8) + 0.1*(16 - (stats[p]?.challenge ?? 8))) * relFactor(voteWinner,p));
     if(inAlliance(voteWinner, p3_chosenAlly)) incRel(voteWinner, p3_chosenAlly, +2);
 
     addVoteColumn(`P3 Vote`, 'P3', 1, knownVoters, votePairs, voteWinner, null);
@@ -1030,11 +1082,6 @@ function displayJuryMatrix(matrix){
   html += `<div class="hint">Total jury keys distributed: <strong>${totalGiven}</strong> (should be exactly 16)</div>`;
   area.innerHTML = html;
 }
-
-/* ====== Build/refresh stats & rel table on input changes ====== */
-document.getElementById('playerInput').addEventListener('input', ()=>{
-  if(!gameStarted) { buildStatsTable(); renderRelsLive(); }
-});
 </script>
 </body>
 </html>
