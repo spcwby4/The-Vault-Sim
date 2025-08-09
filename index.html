@@ -1,1091 +1,910 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>The Vault Simulator</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>The Vault — ALT Rules (13 Players, Full Features)</title>
 <style>
   :root{
-    --bg:#0f1115; --panel:#1a1d24; --muted:#2a2f3a; --text:#e5e7eb; --sub:#aeb4c0;
-    --accent:#7aa2ff; --good:#6ee7b7; --warn:#fbbf24; --bad:#f87171; --border:#2b3340;
+    --bg:#0f1115; --panel:#161a22; --panel2:#1c2130; --muted:#2a2f3a; --text:#e5e7eb; --sub:#aeb4c0;
+    --good:#6ee7b7; --warn:#fbbf24; --bad:#f87171; --accent:#7aa2ff; --border:#2b3340;
   }
   *{box-sizing:border-box}
-  body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);padding:20px;margin:0}
-  h1{margin:0 0 16px;text-align:center}
-  h2{margin:0 0 10px;font-size:18px;color:var(--text)}
-  textarea,button,input,select{width:100%;padding:10px;margin-top:10px;font-size:15px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
-  button{cursor:pointer} button:hover{background:var(--muted)}
-  .box{background:var(--panel);padding:15px;border-radius:12px;box-shadow:0 0 0 1px var(--border);margin-bottom:18px}
-  pre{background:var(--bg);padding:10px;border-radius:8px;height:220px;overflow-y:auto;border:1px solid var(--border);white-space:pre-wrap}
-  table{width:100%;border-collapse:collapse;margin-top:10px}
-  th,td{border:1px solid var(--border);padding:8px;text-align:center;white-space:nowrap}
-  th{background:var(--muted);position:sticky;top:0}
-  .pill{display:inline-block;min-width:20px;border-radius:6px;padding:2px 6px}
-  .ok{background:rgba(110,231,183,.15);border:1px solid rgba(110,231,183,.35)}
-  .no{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3)}
-  .table-scroll{overflow:auto;max-width:100%}
-  .stats-input{width:70px}
-  .rowwrap{display:flex;gap:18px;flex-wrap:wrap}
-  .third{flex:1 1 240px}
-  .right{max-width:520px}
-  .hint{color:var(--sub);font-size:13px;margin-top:6px}
-  .badge{display:inline-block;padding:2px 6px;border-radius:6px;background:var(--muted);font-size:12px;margin-left:6px}
-  .muted{color:var(--sub)}
-  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:6px 8px;border-radius:8px}
-  .avatar{width:28px;height:28px;border-radius:6px;object-fit:cover;background:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
-  .grid{display:grid;gap:10px}
-  .grid-2{grid-template-columns: repeat(2, minmax(0,1fr))}
-  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:20}
-  .modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:900px;width:95%;max-height:85vh;overflow:auto;padding:16px}
-  .modal h3{margin:0 0 8px}
-  .flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px}
-  .small{font-size:12px;color:var(--sub)}
-  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
-  .color{height:34px}
-  .svgwrap{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  h1{margin:0;font-size:20px}
+  h2{margin:0 0 10px;font-size:16px}
+  h3{margin:0 0 6px;font-size:15px}
+  textarea,button,input,select{width:100%;padding:12px;margin-top:8px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:16px}
+  button{cursor:pointer} button:hover{background:#202739}
+  .app{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+  @media (max-width: 960px){ .app{grid-template-columns:1fr} }
+  .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:12px;position:sticky;top:0;height:100vh}
+  @media (max-width:960px){ .sidebar{position:relative;height:auto} }
+  .brand{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .hamburger{display:none;font-size:18px;padding:8px 10px;border-radius:8px;background:var(--panel2)}
+  @media (max-width:960px){ .hamburger{display:inline-block} .sidebar.collapsed .collapsible-area{display:none} }
+  .navbox{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .epList{flex:1;overflow:auto;border:1px solid var(--border);border-radius:10px}
+  .epItem{padding:10px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center}
+  .epItem:last-child{border-bottom:none}
+  .thumb{width:36px;height:36px;border-radius:8px;background:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px}
+  .main{padding:16px;display:grid;gap:14px}
+  .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .col{flex:1 1 280px}
+  pre{white-space:pre-wrap;background:#0b0d12;border:1px solid var(--border);border-radius:10px;padding:10px;min-height:180px;max-height:280px;overflow:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid var(--border);padding:6px;text-align:center;white-space:nowrap}
+  th{background:#1b2130}
+  .hint{font-size:13px;color:var(--sub)}
+  .chip{display:flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px 8px;border-radius:10px;margin:6px 0}
+  .avatar{width:22px;height:22px;border-radius:6px;object-fit:cover;background:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+  .pill{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;margin-right:6px}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sub)}
+  .toggle span{color:var(--text);font-weight:600}
 </style>
 </head>
 <body>
-
-<h1>The Vault Simulator <span class="badge">Dark</span></h1>
-
-<div class="box">
-  <label for="playerInput"><strong>Enter 12 Players (one per line):</strong></label>
-  <textarea id="playerInput" rows="12" placeholder="Player 1&#10;Player 2&#10;..."></textarea>
-  <button id="startBtn">Start Game</button>
-  <button id="nextBtn" style="display:none;">Next</button>
-  <div class="btn-row">
-    <button id="openEpisodes" style="display:none;">Episode Recaps</button>
-    <button id="openSeasonRecap" style="display:none;">Season Recap</button>
-    <button id="openStats" style="display:none;">Post‑Season Stats</button>
-  </div>
-  <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote, then duel) → Finale (Jury → Open → Winner). Final 4: 2‑way tie = tied duel; 4‑way tie = top‑3 challenge.</div>
-</div>
-
-<div class="box" id="alliancesBox">
-  <h2>Alliances</h2>
-  <div id="alliancesList"></div>
-</div>
-
-<div class="rowwrap">
-  <div class="box third" id="statsBox">
-    <h2>Player Stats (Preseason)</h2>
-    <div id="statsTable"></div>
-    <div class="rowwrap">
-      <button id="presetBalanced" class="third">Balanced</button>
-      <button id="presetSocial" class="third">Social‑heavy</button>
-      <button id="presetChallenge" class="third">Challenge‑heavy</button>
-      <button id="presetRandom" class="third">Randomize All</button>
+<div class="app">
+  <!-- Sidebar (Episodes + Spoiler toggle + Season controls) -->
+  <aside class="sidebar collapsed" id="sidebar">
+    <div class="brand">
+      <h1>Vault — Alt S1</h1>
+      <button class="hamburger" id="hamburger">☰</button>
     </div>
-    <button id="applyStats">Apply Stats</button>
-    <div class="hint">Range: 1–15. Defaults to 8/8. Hidden in‑game.</div>
-  </div>
+    <div class="collapsible-area">
+      <div class="navbox">
+        <label class="toggle"><input type="checkbox" id="spoilerToggle"/><span>Spoiler‑free nav</span></label>
+      </div>
 
-  <div class="box third" id="relsPreBox">
-    <h2>Relationships (Preseason)</h2>
-    <div class="hint">Pick a focus player, then set their relationship to each other player (−5..+5).</div>
-    <div class="rowwrap" style="align-items:center">
-      <label class="muted">Focus Player</label>
-      <select id="relFocus"></select>
+      <div class="box" id="seasonControls">
+        <h2>Season Controls</h2>
+        <label>Alliance Preset</label>
+        <select id="alliancePreset">
+          <option value="fluid">Fluid webs (default)</option>
+          <option value="loyal">Loyal blocs</option>
+          <option value="duos">Duo‑centric</option>
+          <option value="loners">Loners thrive</option>
+        </select>
+        <hr style="border-color:var(--border);margin:12px 0">
+        <label class="toggle"><input type="checkbox" id="tw_noLockpick"><span>No Lockpick</span></label>
+        <label class="toggle"><input type="checkbox" id="tw_doubleDuel" disabled><span>Double Duel (P2) — not in Alt</span></label>
+        <div class="hint">These lock & disappear when you press Start Season.</div>
+      </div>
+
+      <div class="epList" id="epList"></div>
     </div>
-    <div id="relEditor"></div>
-    <div class="rowwrap" style="margin-top:8px">
-      <button id="relSave" class="third">Save (All Players)</button>
-      <button id="relRandFocus" class="third">Randomize Mild (Focus)</button>
-      <button id="relClearFocus" class="third">Clear (Focus)</button>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="box">
+      <div class="row">
+        <div class="col">
+          <label><b>Enter 13 Players (one per line)</b></label>
+          <textarea id="playerInput" rows="13" placeholder="Player 1&#10;Player 2&#10;..."></textarea>
+          <div class="row">
+            <button id="startBtn">Start Season</button>
+            <button id="nextBtn" style="display:none;">Next Scene ▶</button>
+          </div>
+          <div class="hint">Alt Vault rules active: P1 (R1–R4 draw 6, R4 can be 7; R5 last‑chance vote). P2 (R1–R4 standard with tie logic; R5 last‑chance challenge). P3 bottom‑3 challenge. Finale fallback: Final‑3 challenge.</div>
+        </div>
+        <div class="col" id="castBox">
+          <h2>Cast Photos & Colors</h2>
+          <div id="castGrid"></div>
+        </div>
+      </div>
     </div>
-    <div class="rowwrap" style="margin-top:8px">
-      <button id="relRandAll" class="third">Randomize Mild (All)</button>
-      <button id="relClearAll" class="third">Clear (All)</button>
+
+    <div class="box" id="preseasonBox">
+      <h2>Preseason: Stats & Relationships</h2>
+      <div class="row">
+        <div class="col">
+          <h3>Player Stats</h3>
+          <div id="statsTable"></div>
+          <div class="row">
+            <button id="presetBalanced">Balanced</button>
+            <button id="presetSocial">Social‑heavy</button>
+            <button id="presetChallenge">Challenge‑heavy</button>
+            <button id="presetRandom">Randomize All</button>
+            <button id="applyStats">Apply Stats</button>
+          </div>
+          <div class="hint">Range: 1–15 (default 8/8). Hidden once the game starts.</div>
+        </div>
+        <div class="col">
+          <h3>Relationships (−5…+5)</h3>
+          <div class="row" style="align-items:center">
+            <label>Focus</label>
+            <select id="relFocus"></select>
+          </div>
+          <div id="relEditor" style="margin-top:6px"></div>
+          <div class="row" style="margin-top:6px">
+            <button id="relSave">Save (All)</button>
+            <button id="relRandFocus">Randomize Focus</button>
+            <button id="relClearFocus">Clear Focus</button>
+            <button id="relRandAll">Randomize All</button>
+            <button id="relClearAll">Clear All</button>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div class="box third right" id="castBox">
-    <h2>Cast Photos & Colors (Optional)</h2>
-    <div id="castGrid"></div>
-    <div class="hint">Paste image URLs or leave blank for initials. Colors show in tables/modals.</div>
-  </div>
+    <div class="box">
+      <h2>Round Events (Scene Feed)</h2>
+      <pre id="sceneFeed">(Ready) Tap “Next Scene”.</pre>
+    </div>
+
+    <div class="row">
+      <div class="box col">
+        <h2>Alliances</h2>
+        <div id="alliancesList"></div>
+      </div>
+      <div class="box col">
+        <h2>Progress</h2>
+        <div id="progressChart"></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="box col">
+        <h2>Voting Matrix (Season)</h2>
+        <div id="votingMatrix"></div>
+        <div class="hint">Order: active → P3 elim → P2 elim → P1 elim. “LOCKPICK” appears if used.</div>
+      </div>
+      <div class="box col">
+        <h2>Relationships (Live)</h2>
+        <div id="relsLive"></div>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Jury Key Distribution</h2>
+      <div id="juryMatrix"></div>
+    </div>
+
+  </main>
 </div>
-
-<div class="box">
-  <h2>Round Events</h2>
-  <pre id="roundEvents"></pre>
-</div>
-
-<div class="box">
-  <h2>Progress Chart</h2>
-  <div id="progressChart"></div>
-</div>
-
-<div class="box">
-  <h2>Voting Matrix (Season)</h2>
-  <div id="votingMatrix"></div>
-  <div class="hint">LOCKPICK appears in the voter’s cell if used. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
-</div>
-
-<div class="box">
-  <h2>Relationships (Live)</h2>
-  <div id="relsLive"></div>
-</div>
-
-<div class="box">
-  <h2>Jury Key Distribution</h2>
-  <div id="juryMatrix"></div>
-</div>
-
-<!-- Modals -->
-<div class="modal-bg" id="episodesModal"><div class="modal">
-  <div class="flex-between"><h3>Episode Recaps</h3>
-    <div class="btn-row"><button id="prevEp">◀</button><span id="epTitle" class="small"></span><button id="nextEp">▶</button><button onclick="closeModal('episodesModal')">Close</button></div>
-  </div><div id="epContent"></div></div></div>
-
-<div class="modal-bg" id="seasonModal"><div class="modal">
-  <div class="flex-between"><h3>Season Recap</h3><button onclick="closeModal('seasonModal')">Close</button></div>
-  <div id="seasonContent"></div></div></div>
-
-<div class="modal-bg" id="statsModal"><div class="modal">
-  <div class="flex-between"><h3>Post‑Season Stats</h3><button onclick="closeModal('statsModal')">Close</button></div>
-  <div id="statsContent"></div></div></div>
 
 <script>
-/* ===== Tunables ===== */
+/* ================= Tunables (carryover) ================= */
+var SEASON = { preset:'fluid', noLockpick:false };
 var ALPHA_SOCIAL=0.65, BETA_CHALLENGE=1.0, GAMMA_BEATABLE=1.2;
 var LOGIT_K=0.7, WIN_CLAMP_LO=0.15, WIN_CLAMP_HI=0.85;
 var VOTE_JITTER_MIN=0.8, VOTE_JITTER_MAX=1.2, ALLY_PREFERENCE_RATE=0.6;
 var REL_SCALE=0.08, REL_MIN_FACTOR=0.3;
 
-/* ===== State ===== */
+/* ================= Event Library (carryover) ================= */
+const EVENT_LIBRARY = [
+  {type:'bond',    text:(a,b)=>`${a} flips ${b}'s mattress back after a prank; they laugh it off. (+1)`, w:2},
+  {type:'tension', text:(a,b)=>`${a} flips ${b}'s mattress during a nap. (-1)`, w:1},
+  {type:'tension', text:(a,b)=>`${a} accidentally breaks ${b}'s mug. Tension rises. (-1)`, w:1},
+  {type:'bond',    text:(a,b)=>`${a} replaces ${b}'s broken mug with a new one. (+1)`, w:1},
+  {type:'tension', text:(a,b)=>`A plane flies overhead: “${b} is not to be trusted!” ${a} side‑eyes ${b}. (-1)`, w:1},
+  {type:'bond',    text:(a,b)=>`${a} comforts ${b} after a rough day. (+1)`, w:2},
+  {type:'tension', text:(a,b)=>`${a} spreads a rumor that ${b} has the Lockpick. (-1)`, w:1},
+  {type:'bond',    text:(a,b)=>`${a} shares food with ${b}. (+1)`, w:2},
+  {type:'tension', text:(a,b)=>`${a} hogs the shower and ${b} calls them out. (-1)`, w:1},
+  {type:'bond',    text:(a,b)=>`${a} and ${b} stay up strategizing together. (+1)`, w:2},
+  {type:'tension', text:(a,b)=>`${a} hides ${b}'s shoes before the draw. (-1)`, w:1},
+  {type:'bond',    text:(a,b)=>`${a} teaches ${b} a challenge trick. (+1)`, w:2},
+  {type:'tension', text:(a,b)=>`${a} refuses to throw a duel for ${b}. (-1)`, w:1}
+];
+
+/* ================= State ================= */
 var players=[], initialOrder=[], phase=1, round=1;
 var alliances={}, keys={}, jury=[], finalists=[], eliminated=[];
 var lockpickHolder=null, lockpickUsed=false, lockpickFound=false;
-var voteColumns=[], knownVoters=[], vaults=[]; for(var i=3;i<=22;i++) vaults.push(i);
-var gameStarted=false, phase3Step=0;
+var voteColumns=[], spoilerFree=false;
+var stats={}, rel={}, cast={};
+var wins={}, losses={}, keysEarned={}, votesGiven={}, votesReceived={}, juryKeysReceived={};
 
-var finaleStep=0, finaleState={ finalistKeys:null, chosenVaults:null, juryMatrix:null, resultList:null, winner:null };
+/* Episode system */
+var episodes=[], currentEpisode=null, sceneQueue=[], sceneIndex=0;
 
-var stats={}, rel={}, relUpdateQueue=[];
-var episodes=[], currentScenes=[], epIndex=-1;
-var cast={};
-var duelWins={}, duelLosses={}, keysEarned={}, votesGiven={}, votesReceived={}, juryKeysReceived={};
-var relTimeline=[];
+/* Temps */
+var p1_step=0, p1_drawn=[], p1_votePairs=[], p1_voteWinner=null, p1_tiedGroup=[];
+var p2_step=0, p2_votePairs=[], p2_noP2=[], p2_tied=[], p2_voteWinner=null, p2_picks=[];
+var p3_step=0, p3_duelists=[];
+var finaleState=null;
 
-/* NEW: step machines */
-var p1Step=0, p2Step=0;
-/* P1 temps */
-var p1_drawn=[], p1_votePairs=[], p1_voteWinner=null, p1_lockUser=null, p1_challengeWinner=null;
-/* P2 temps */
-var p2_noKey=[], p2_votePairs=[], p2_voteWinner=null, p2_lockUser=null, p2_candidates=[],
-    p2_allies=[], p2_nonAllies=[], p2_opponent=null, p2_reason='', p2_duelWinner=null, p2_duelLoser=null;
-
-/* ===== DOM ===== */
+/* ================= DOM ================= */
+var sidebar=document.getElementById('sidebar');
+document.getElementById('hamburger').onclick=function(){ sidebar.classList.toggle('collapsed'); };
+document.getElementById('spoilerToggle').onchange=function(){ spoilerFree=this.checked; renderEpisodeNav(); };
+document.getElementById('alliancePreset').onchange=function(){ SEASON.preset=this.value; };
+document.getElementById('tw_noLockpick').onchange=function(){ SEASON.noLockpick=this.checked; };
 var startBtn=document.getElementById('startBtn'), nextBtn=document.getElementById('nextBtn');
-var roundsBox=document.getElementById('roundEvents'), statsBox=document.getElementById('statsBox');
-var relsPreBox=document.getElementById('relsPreBox'), statsTableDiv=document.getElementById('statsTable');
-var castGridDiv=document.getElementById('castGrid');
+var sceneFeed=document.getElementById('sceneFeed'), epListDiv=document.getElementById('epList');
 
-document.getElementById('openEpisodes').onclick=function(){openModal('episodesModal')};
-document.getElementById('openSeasonRecap').onclick=function(){openSeasonModal()};
-document.getElementById('openStats').onclick=function(){openStatsModal()};
-document.getElementById('prevEp').onclick=function(){ setEpIndex(epIndex-1) };
-document.getElementById('nextEp').onclick=function(){ setEpIndex(epIndex+1) };
+startBtn.onclick=startSeason;
+nextBtn.onclick=function(){
+  if (sceneQueue.length){ showLine(sceneQueue.shift()); currentEpisode.linesViewed++; renderEpisodeNav(); return; }
+  const prevTotal=currentEpisode?.total||0; progressGame();
+  if (sceneQueue.length && (currentEpisode?.total||0) > prevTotal){ showLine(sceneQueue.shift()); currentEpisode.linesViewed++; renderEpisodeNav(); }
+};
 
-startBtn.onclick=startGame; nextBtn.onclick=nextRound;
-
-/* ===== Log & Episodes ===== */
-function log(msg){ roundsBox.textContent += (roundsBox.textContent?'\n':'') + msg; roundsBox.scrollTop=roundsBox.scrollHeight; pushSceneLine('Events', msg); }
-function clearLog(){ roundsBox.textContent=''; }
-function queueRelUpdate(msg){ relUpdateQueue.push(msg); }
-function flushRelUpdates(label){
-  if(!relUpdateQueue.length) return;
-  var title = label || 'Relationship updates';
-  log('— '+title+' —');
-  for(var i=0;i<relUpdateQueue.length;i++){ roundsBox.textContent+='\n'+relUpdateQueue[i]; }
-  roundsBox.scrollTop=roundsBox.scrollHeight;
-  pushSceneLines(title, relUpdateQueue.slice());
-  relUpdateQueue=[];
-}
-function newEpisode(title){ currentScenes=[]; episodes.push({title:title,scenes:currentScenes,snap:seasonSnapshot()}); epIndex=episodes.length-1; renderEpisodesButton(); }
-function pushScene(label){ currentScenes.push({label:label,lines:[]}); }
-function pushSceneLine(label,line){ var s=null; for(var i=0;i<currentScenes.length;i++){ if(currentScenes[i].label===label){ s=currentScenes[i]; break; } } if(!s){ s={label:label,lines:[]}; currentScenes.push(s); } s.lines.push(line); }
-function pushSceneLines(label,lines){ var s=null; for(var i=0;i<currentScenes.length;i++){ if(currentScenes[i].label===label){ s=currentScenes[i]; break; } } if(!s){ s={label:label,lines:[]}; currentScenes.push(s); } Array.prototype.push.apply(s.lines, lines); }
-function seasonSnapshot(){ return { players:players.slice(), finalists:finalists.slice(), eliminated:eliminated.slice(), jury: jury.map(function(j){return {name:j.name,phase:j.phase}}), alliances: JSON.parse(JSON.stringify(alliances)), keys: JSON.parse(JSON.stringify(keys)) }; }
-
-/* ===== Utils ===== */
-function shuffle(a){ return a.slice().sort(function(){return Math.random()-0.5}); }
+/* ================= Utils ================= */
+function shuffle(a){ return a.slice().sort(()=>Math.random()-0.5); }
 function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
-function inAlliance(a,b){ var lists=Object.values(alliances); for(var i=0;i<lists.length;i++){ var L=lists[i]; if(L.indexOf(a)!==-1 && L.indexOf(b)!==-1) return true; } return false; }
-function getElimPhase(n){ for(var i=0;i<jury.length;i++){ if(jury[i].name===n) return jury[i].phase; } return null; }
-function initials(name){ var parts=name.split(/\s+/), t=''; for(var i=0;i<parts.length;i++){ if(parts[i]) t+=parts[i][0]; } return (t||'?').slice(0,2).toUpperCase(); }
+function initials(n){ return (n.split(/\s+/).map(x=>x[0]).join('')||'?').slice(0,2).toUpperCase(); }
+function inAlliance(a,b){ return Object.values(alliances).some(L=>L.includes(a)&&L.includes(b)); }
+function getElimPhase(n){ const x=jury.find(j=>j.name===n); return x?x.phase:null; }
+function setRel(a,b,val){ rel[a]=rel[a]||{}; rel[b]=rel[b]||{}; rel[a][b]=val; rel[b][a]=val; }
+function getRel(a,b){ return rel[a]?.[b] ?? 0; }
+function relFactor(voter,target){ return clamp(1+REL_SCALE*getRel(voter,target), REL_MIN_FACTOR, 2); }
+function weighted(items, fn){ const w=items.map(fn); const s=w.reduce((a,b)=>a+b,0); let r=Math.random()*s; for(let i=0;i<items.length;i++){ r-=w[i]; if(r<=0) return items[i]; } return items[items.length-1]; }
+function duelWinProb(a,b){ const da=stats[a]?.challenge||8, db=stats[b]?.challenge||8; const p=1/(1+Math.exp(-LOGIT_K*(da-db))); return clamp(p,WIN_CLAMP_LO,WIN_CLAMP_HI); }
 
-function setRel(a,b,val){ if(!rel[a]) rel[a]={}; if(!rel[b]) rel[b]={}; rel[a][b]=val; rel[b][a]=val; }
-function getRel(a,b){ return (rel[a] && typeof rel[a][b]!=='undefined') ? rel[a][b] : 0; }
-function incRel(a,b,delta){ var v=clamp(getRel(a,b)+delta,-5,5); setRel(a,b,v); if(delta>0) queueRelUpdate(a+' and '+b+' strengthen their bond (+'+delta+' → '+v+').'); else if(delta<0) queueRelUpdate(a+' and '+b+' get into a fight ('+delta+' → '+v+').'); renderRelsLive(); }
-
-function weightedChoice(items, weightsOrFn){
-  var w=[], i;
-  if(typeof weightsOrFn==='function'){ for(i=0;i<items.length;i++){ var val=Math.max(0.0001, weightsOrFn(items[i])); w.push(val); } }
-  else if(Array.isArray(weightsOrFn)){ w=weightsOrFn.slice(); }
-  else { for(i=0;i<items.length;i++) w.push(1); }
-  if(w.length!==items.length) { w=[]; for(i=0;i<items.length;i++) w.push(1); }
-  var sum=0; for(i=0;i<w.length;i++) sum+=w[i];
-  var r=Math.random()*sum;
-  for(i=0;i<items.length;i++){ r-=w[i]; if(r<=0) return items[i]; }
-  return items[items.length-1];
+/* Episodes */
+function ensureEpisode(){ const tag=`Phase ${phase} R${round}`; if(!currentEpisode || currentEpisode._tag!==tag){ currentEpisode={title:`Episode ${episodes.length+1} — ${tag}`, _tag:tag, linesViewed:0, total:0}; episodes.push(currentEpisode); sceneQueue=[]; sceneIndex=0; renderEpisodeNav(); showLine('(Ready) Tap “Next Scene”.'); } }
+function addScene(text){ sceneQueue.push(text); if(currentEpisode) currentEpisode.total++; }
+function showLine(text){ sceneFeed.textContent=text; }
+function renderEpisodeNav(){
+  epListDiv.innerHTML=episodes.map((ep,i)=>`
+    <div class="epItem">
+      <div class="thumb">${i+1}</div>
+      <div style="flex:1">
+        <div>${ep.title}</div>
+        <div><small>${ep.linesViewed} / ${ep.total} scenes</small></div>
+      </div>
+    </div>`).join('');
 }
-function duelWinProb(a,b){
-  var da=(stats[a]?stats[a].challenge:8), db=(stats[b]?stats[b].challenge:8);
-  var p=1/(1+Math.exp(-LOGIT_K*(da-db)));
-  return clamp(p,WIN_CLAMP_LO,WIN_CLAMP_HI);
-}
-function relFactor(voter,target){ var rf=1+REL_SCALE*getRel(voter,target); return clamp(rf,REL_MIN_FACTOR,2); }
 
-/* ===== Preseason UIs ===== */
-document.getElementById('applyStats').onclick=applyStatsFromInputs;
-document.getElementById('presetBalanced').onclick=function(){presetStats('balanced')};
-document.getElementById('presetSocial').onclick=function(){presetStats('social')};
-document.getElementById('presetChallenge').onclick=function(){presetStats('challenge')};
-document.getElementById('presetRandom').onclick=function(){presetStats('random')};
+/* Preseason builders */
+const castGrid=document.getElementById('castGrid'), statsTable=document.getElementById('statsTable');
+function preNames(){ return document.getElementById('playerInput').value.trim().split('\n').map(s=>s.trim()).filter(Boolean); }
+document.getElementById('playerInput').addEventListener('input', ()=>{ if(!gameStarted){ buildStatsTable(); buildRelFocusList(); buildCastGrid(); renderRelsLive(); }});
 
-function buildStatsTable(){
-  var vals=getPlist();
-  var html='<div class="table-scroll"><table><tr><th>Player</th><th>Social</th><th>Challenge</th></tr>';
-  for(var i=0;i<vals.length;i++){
-    var n=vals[i], s=(stats[n]?stats[n].social:8), c=(stats[n]?stats[n].challenge:8);
-    html+='<tr><td>'+n+'</td>'+
-      '<td><input class="stats-input" type="number" min="1" max="15" value="'+s+'" data-name="'+n+'" data-field="social"></td>'+
-      '<td><input class="stats-input" type="number" min="1" max="15" value="'+c+'" data-name="'+n+'" data-field="challenge"></td></tr>';
+function buildCastGrid(){
+  const names=preNames(); if(!names.length){ castGrid.innerHTML=''; return; }
+  if(!Object.keys(cast).length){
+    const pal=["#7aa2ff","#ffa07a","#a3e635","#f472b6","#facc15","#34d399","#60a5fa","#f59e0b","#22d3ee","#c084fc","#fb7185","#93c5fd","#38bdf8"];
+    names.forEach((n,i)=> cast[n]={photo:'',color:pal[i%pal.length]});
   }
-  html+='</table></div>';
-  statsTableDiv.innerHTML=html;
+  castGrid.innerHTML=names.map(n=>{
+    const c=cast[n]||{photo:'',color:'#7aa2ff'};
+    return `<div class="chip">
+      ${c.photo?`<img class="avatar" src="${c.photo}">`:`<div class="avatar" style="background:${c.color}">${initials(n)}</div>`}
+      <div style="flex:1">${n}<input type="url" class="photoUrl" data-name="${n}" placeholder="Image URL" value="${c.photo}"></div>
+      <input type="color" class="color" data-name="${n}" value="${c.color}">
+    </div>`;
+  }).join('');
+  castGrid.querySelectorAll('.photoUrl').forEach(inp=> inp.oninput=()=>{ const n=inp.dataset.name; cast[n]=cast[n]||{photo:'',color:'#7aa2ff'}; cast[n].photo=inp.value.trim(); buildCastGrid(); });
+  castGrid.querySelectorAll('.color').forEach(inp=> inp.oninput=()=>{ const n=inp.dataset.name; cast[n]=cast[n]||{photo:'',color:'#7aa2ff'}; cast[n].color=inp.value; buildCastGrid(); });
 }
-function getPlist(){
-  var input=document.getElementById('playerInput').value.trim().split('\n');
-  var out=[]; for(var i=0;i<input.length;i++){ var t=input[i].trim(); if(t) out.push(t); }
-  return out.length? out : Object.keys(stats);
+function buildStatsTable(){
+  const names=preNames();
+  statsTable.innerHTML = `<table><tr><th>Player</th><th>Social</th><th>Challenge</th></tr>${
+    names.map(n=>{
+      const s=stats[n]?.social??8, c=stats[n]?.challenge??8;
+      return `<tr><td>${n}</td>
+        <td><input type="number" class="st" data-name="${n}" data-field="social" min="1" max="15" value="${s}"></td>
+        <td><input type="number" class="st" data-name="${n}" data-field="challenge" min="1" max="15" value="${c}"></td></tr>`;
+    }).join('')
+  }</table>`;
 }
 function applyStatsFromInputs(){
-  var ins=statsTableDiv.querySelectorAll('input.stats-input');
-  for(var i=0;i<ins.length;i++){
-    var inp=ins[i], n=inp.getAttribute('data-name'), f=inp.getAttribute('data-field');
-    var v=parseInt(inp.value||'8',10); v=clamp(v,1,15);
-    if(!stats[n]) stats[n]={social:8,challenge:8};
-    stats[n][f]=v;
-  }
-  log('Preseason stats applied.');
+  statsTable.querySelectorAll('.st').forEach(inp=>{
+    const n=inp.dataset.name, f=inp.dataset.field, v=clamp(parseInt(inp.value||'8',10),1,15);
+    stats[n]=stats[n]||{social:8,challenge:8}; stats[n][f]=v;
+  });
 }
+document.getElementById('applyStats').onclick=applyStatsFromInputs;
+document.getElementById('presetBalanced').onclick=()=>presetStats('balanced');
+document.getElementById('presetSocial').onclick=()=>presetStats('social');
+document.getElementById('presetChallenge').onclick=()=>presetStats('challenge');
+document.getElementById('presetRandom').onclick=()=>presetStats('random');
 function presetStats(which){
-  var names=getPlist();
-  for(var i=0;i<names.length;i++){
-    var n=names[i]; if(!stats[n]) stats[n]={social:8,challenge:8};
-    if(which==='balanced'){ stats[n].social=8; stats[n].challenge=8; }
-    if(which==='social'){ stats[n].social=12; stats[n].challenge=8; }
-    if(which==='challenge'){ stats[n].social=8; stats[n].challenge=12; }
-    if(which==='random'){ stats[n].social=Math.floor(1+Math.random()*15); stats[n].challenge=Math.floor(1+Math.random()*15); }
-  }
-  buildStatsTable(); buildCastGrid();
+  const names=preNames();
+  names.forEach(n=>{
+    stats[n]=stats[n]||{social:8,challenge:8};
+    if(which==='balanced') stats[n]={social:8,challenge:8};
+    if(which==='social')   stats[n]={social:12,challenge:8};
+    if(which==='challenge')stats[n]={social:8,challenge:12};
+    if(which==='random')   stats[n]={social:1+Math.floor(Math.random()*15),challenge:1+Math.floor(Math.random()*15)};
+  });
+  buildStatsTable();
 }
 
-/* Relationships editor */
+/* Relationship editor */
 var relFocusSel=document.getElementById('relFocus'), relEditorDiv=document.getElementById('relEditor');
-document.getElementById('relSave').onclick=saveRelAllSweep;
-document.getElementById('relRandFocus').onclick=randRelFocus;
-document.getElementById('relClearFocus').onclick=clearRelFocus;
-document.getElementById('relRandAll').onclick=randRelAll;
-document.getElementById('relClearAll').onclick=clearRelAll;
-
-function buildRelFocusList(){
-  var names=getPlist(), html='';
-  for(var i=0;i<names.length;i++){ html+='<option value="'+names[i]+'">'+names[i]+'</option>'; }
-  relFocusSel.innerHTML=html;
-  if(names.length) renderRelEditorFor(names[0]);
-}
-if(relFocusSel){ relFocusSel.addEventListener('change', function(e){ renderRelEditorFor(e.target.value); }); }
-
+function buildRelFocusList(){ const names=preNames(); relFocusSel.innerHTML=names.map(n=>`<option>${n}</option>`).join(''); if(names.length) renderRelEditorFor(names[0]); }
+relFocusSel.onchange=()=> renderRelEditorFor(relFocusSel.value);
 function renderRelEditorFor(focus){
-  var names=getPlist().filter(function(n){return n!==focus});
-  var html='<div class="table-scroll"><table><tr><th>Player</th><th>Score (−5..+5)</th></tr>';
-  for(var i=0;i<names.length;i++){
-    var n=names[i], v=getRel(focus,n);
-    html+='<tr><td>'+n+'</td><td><input type="number" class="rel-spin" data-focus="'+focus+'" data-target="'+n+'" min="-5" max="5" step="1" value="'+v+'"></td></tr>';
-  }
-  html+='</table></div>';
-  relEditorDiv.innerHTML=html;
-  var spins=relEditorDiv.querySelectorAll('.rel-spin');
-  for(var j=0;j<spins.length;j++){
-    spins[j].addEventListener('input', function(){
-      var f=this.getAttribute('data-focus'), t=this.getAttribute('data-target');
-      var val=parseInt(this.value||'0',10); val=clamp(val,-5,5); setRel(f,t,val); renderRelsLive();
-    });
-  }
+  const names=preNames().filter(n=>n!==focus);
+  relEditorDiv.innerHTML = `<table><tr><th>Player</th><th>Score</th></tr>${
+    names.map(n=>`<tr><td>${n}</td><td><input type="number" class="relSpin" data-focus="${focus}" data-target="${n}" min="-5" max="5" step="1" value="${getRel(focus,n)}"></td></tr>`).join('')
+  }</table>`;
+  relEditorDiv.querySelectorAll('.relSpin').forEach(sp=> sp.oninput=()=>{ const f=sp.dataset.focus,t=sp.dataset.target; setRel(f,t,clamp(parseInt(sp.value||'0',10),-5,5)); renderRelsLive(); });
 }
-function saveRelAllSweep(){
-  var names=getPlist(), spins=relEditorDiv.querySelectorAll('.rel-spin'), i;
-  for(i=0;i<spins.length;i++){
-    var f=spins[i].getAttribute('data-focus'), t=spins[i].getAttribute('data-target');
-    var val=parseInt(spins[i].value||'0',10); setRel(f,t,clamp(val,-5,5));
+document.getElementById('relSave').onclick=()=>{
+  relEditorDiv.querySelectorAll('.relSpin').forEach(sp=>{ const f=sp.dataset.focus,t=sp.dataset.target; setRel(f,t,clamp(parseInt(sp.value||'0',10),-5,5)); });
+  const names=preNames(); names.forEach(a=>names.forEach(b=>{ if(a!==b) setRel(a,b,getRel(a,b)); }));
+  addScene('Saved all preseason relationships.'); renderRelsLive();
+};
+document.getElementById('relRandFocus').onclick=()=>{
+  const f=relFocusSel.value; relEditorDiv.querySelectorAll('.relSpin').forEach(sp=>{ const t=sp.dataset.target; const v=Math.floor(-2+Math.random()*5); setRel(f,t,v); sp.value=v; });
+  addScene('Randomized focus relationships for '+f+'.'); renderRelsLive();
+};
+document.getElementById('relClearFocus').onclick=()=>{
+  const f=relFocusSel.value; relEditorDiv.querySelectorAll('.relSpin').forEach(sp=>{ const t=sp.dataset.target; setRel(f,t,0); sp.value=0; });
+  addScene('Cleared focus relationships for '+f+'.'); renderRelsLive();
+};
+document.getElementById('relRandAll').onclick=()=>{
+  const names=preNames();
+  for(let i=0;i<names.length;i++) for(let j=i+1;j<names.length;j++){
+    const v = Math.floor(-2 + Math.random()*5);
+    setRel(names[i], names[j], v);
   }
-  for(i=0;i<names.length;i++){
-    var f2=names[i];
-    for(var j=0;j<names.length;j++){
-      var t2=names[j]; if(f2===t2) continue;
-      setRel(f2,t2,getRel(f2,t2));
-    }
-  }
-  log('Saved relationships for ALL players.');
-  renderRelsLive();
-}
-function randRelFocus(){
-  var f=relFocusSel.value, spins=relEditorDiv.querySelectorAll('.rel-spin');
-  for(var i=0;i<spins.length;i++){
-    var t=spins[i].getAttribute('data-target'), val=Math.floor(-2+Math.random()*5);
-    setRel(f,t,val); spins[i].value=val;
-  }
-  log('Randomized (mild) relationships for '+f+'.'); renderRelsLive();
-}
-function clearRelFocus(){
-  var f=relFocusSel.value, spins=relEditorDiv.querySelectorAll('.rel-spin');
-  for(var i=0;i<spins.length;i++){ var t=spins[i].getAttribute('data-target'); setRel(f,t,0); spins[i].value=0; }
-  log('Cleared relationships for '+f+'.'); renderRelsLive();
-}
-function randRelAll(){
-  var names=getPlist();
-  for(var i=0;i<names.length;i++){
-    for(var j=i+1;j<names.length;j++){
-      var v=Math.floor(-2+Math.random()*5);
-      setRel(names[i],names[j],v);
-    }
-  }
-  log('Randomized (mild) relationships for all players.');
-  renderRelEditorFor(relFocusSel.value); renderRelsLive();
-}
-function clearRelAll(){
-  var names=getPlist();
-  for(var i=0;i<names.length;i++){
-    for(var j=i+1;j<names.length;j++){
-      setRel(names[i],names[j],0);
-    }
-  }
-  log('Cleared all preseason relationships.');
-  renderRelEditorFor(relFocusSel.value); renderRelsLive();
-}
+  renderRelEditorFor(relFocusSel.value || names[0]);
+  addScene('Randomized relationships for all players.'); renderRelsLive();
+};
+document.getElementById('relClearAll').onclick=()=>{
+  const names=preNames();
+  for(let i=0;i<names.length;i++) for(let j=i+1;j<names.length;j++){ setRel(names[i], names[j], 0); }
+  renderRelEditorFor(relFocusSel.value || names[0]);
+  addScene('Cleared all relationships.'); renderRelsLive();
+};
 
-/* Cast photos & colors */
-function buildCastGrid(){
-  var names=getPlist();
-  if(!names.length){ castGridDiv.innerHTML=''; return; }
-  if(Object.keys(cast).length===0){
-    var palette=["#7aa2ff","#ffa07a","#a3e635","#f472b6","#facc15","#34d399","#60a5fa","#f59e0b","#22d3ee","#c084fc","#fb7185","#93c5fd"];
-    for(var i=0;i<names.length;i++){ cast[names[i]]={photo:'',color:palette[i%palette.length]}; }
-  }
-  var html='<div class="grid grid-2">';
-  for(var j=0;j<names.length;j++){
-    var n=names[j], c=cast[n]||{photo:'',color:'#7aa2ff'};
-    html+='<div class="chip">'+
-      '<div class="avatar" style="background:'+c.color+';overflow:hidden;">'+(c.photo?'<img src="'+c.photo+'" class="avatar" alt="'+n+'">':'<span>'+initials(n)+'</span>')+'</div>'+
-      '<div style="flex:1"><div class="small">'+n+'</div><input type="url" placeholder="Image URL (optional)" value="'+c.photo+'" data-name="'+n+'" class="photoUrl"></div>'+
-      '<input type="color" class="color" value="'+c.color+'" data-name="'+n+'">'+
-    '</div>';
-  }
-  html+='</div>';
-  castGridDiv.innerHTML=html;
-  var urls=castGridDiv.querySelectorAll('.photoUrl'), cols=castGridDiv.querySelectorAll('.color');
-  for(var k=0;k<urls.length;k++){
-    urls[k].addEventListener('input', function(){ var n=this.getAttribute('data-name'); if(!cast[n]) cast[n]={photo:'',color:'#7aa2ff'}; cast[n].photo=this.value.trim(); buildCastGrid(); });
-  }
-  for(var m=0;m<cols.length;m++){
-    cols[m].addEventListener('input', function(){ var n=this.getAttribute('data-name'); if(!cast[n]) cast[n]={photo:'',color:'#7aa2ff'}; cast[n].color=this.value; buildCastGrid(); });
-  }
+/* Displays */
+function updateAlliances(){
+  const box=document.getElementById('alliancesList');
+  const labels = (SEASON.preset==='duos'? ['A','B','C','D','E','F'] : SEASON.preset==='loners'? ['A','B','C'] : ['A','B','C','D']);
+  alliances={}; labels.forEach(k=>alliances[k]=[]);
+  const sh=shuffle(players);
+  if(SEASON.preset==='duos'){ for(let i=0;i<sh.length;i+=2){ alliances[labels[(i/2)%labels.length]].push(sh[i], sh[i+1]); } }
+  else if(SEASON.preset==='loners'){ for(let i=0;i<sh.length;i++){ alliances[labels[i%labels.length]].push(sh[i]); } }
+  else { for(let i=0;i<sh.length;i++){ alliances[labels[i%labels.length]].push(sh[i]); if(SEASON.preset==='fluid' && Math.random()<0.18){ const other=labels[Math.floor(Math.random()*labels.length)]; if(!alliances[other].includes(sh[i])) alliances[other].push(sh[i]); } } }
+  box.innerHTML = Object.entries(alliances).map(([n,mem])=>`<div><b>${n}</b>: ${mem.join(', ')}</div>`).join('');
 }
-
-/* Live relationships view */
+function updateProgress(){
+  const chart=document.getElementById('progressChart');
+  const everyone=players.concat(eliminated.filter(p=>!players.includes(p)));
+  chart.innerHTML = `<table><tr><th>Player</th><th>P1</th><th>P2</th><th>Final</th><th>W</th><th>L</th></tr>${
+    everyone.map(p=>{
+      const p1=keys[p]?.includes('P1')?'✔':'—', p2=keys[p]?.includes('P2')?'✔':'—', pf=(finalists.includes(p)?'✔':'—');
+      return `<tr><td>${p}</td><td>${p1}</td><td>${p2}</td><td>${pf}</td><td>${wins[p]||0}</td><td>${losses[p]||0}</td></tr>`;
+    }).join('')
+  }</table>`;
+}
 function renderRelsLive(){
-  var wrap=document.getElementById('relsLive');
-  var names=players.length? players : getPlist();
-  if(!names.length){ wrap.innerHTML=''; return; }
-  var pairs=[], seen={};
-  for(var i=0;i<names.length;i++){
-    for(var j=0;j<names.length;j++){
-      var a=names[i], b=names[j]; if(a===b) continue;
-      var key=[a,b].sort().join('|');
-      if(seen[key]) continue; seen[key]=1;
-      pairs.push({a:a,b:b,v:getRel(a,b)});
-    }
+  const wrap=document.getElementById('relsLive'); if(!players.length){ wrap.innerHTML=''; return; }
+  const pairs=[], seen={};
+  for(let i=0;i<players.length;i++)for(let j=0;j<players.length;j++){
+    const a=players[i], b=players[j]; if(a===b) continue; const k=[a,b].sort().join('|'); if(seen[k]) continue; seen[k]=1;
+    pairs.push({a,b,v:getRel(a,b)});
   }
-  pairs.sort(function(x,y){ return Math.abs(y.v)-Math.abs(x.v); });
-  var bonds=pairs.filter(function(p){return p.v>0}).slice(0,6);
-  var feuds=pairs.filter(function(p){return p.v<0}).slice(0,6);
-  wrap.innerHTML='<div class="rowwrap"><div class="third"><strong>Top Bonds</strong><br/>'+(bonds.length?bonds.map(function(p){return p.a+' ↔ '+p.b+' (+'+p.v+')'}).join('<br/>'):'<span class="muted">None yet</span>')+'</div>'+
-    '<div class="third"><strong>Top Rivalries</strong><br/>'+(feuds.length?feuds.map(function(p){return p.a+' ↔ '+p.b+' ('+p.v+')'}).join('<br/>'):'<span class="muted">None yet</span>')+'</div></div>';
+  pairs.sort((x,y)=>Math.abs(y.v)-Math.abs(x.v));
+  const bonds=pairs.filter(p=>p.v>0).slice(0,5), feuds=pairs.filter(p=>p.v<0).slice(0,5);
+  wrap.innerHTML = `<div><strong>Bonds</strong><br/>${bonds.length?bonds.map(p=>`${p.a} ↔ ${p.b} (+${p.v})`).join('<br/>'):'<span class="hint">None</span>'}
+    <hr style="border-color:var(--border)"><strong>Tensions</strong><br/>${feuds.length?feuds.map(p=>`${p.a} ↔ ${p.b} (${p.v})`).join('<br/>'):'<span class="hint">None</span>'}</div>`;
 }
 
-/* Sync preseason UIs with typed names */
-document.getElementById('playerInput').addEventListener('input', function(){ if(!gameStarted){ buildStatsTable(); buildRelFocusList(); buildCastGrid(); renderRelsLive(); }});
-buildStatsTable(); buildRelFocusList(); buildCastGrid();
-
-/* ===== Start / Next (guarded) ===== */
-function startGame(){
-  if(gameStarted) return;
-  var input=document.getElementById('playerInput').value.trim().split('\n'), i, t, list=[];
-  for(i=0;i<input.length;i++){ t=input[i].trim(); if(t) list.push(t); }
-  if(list.length!==12){ alert('Please enter exactly 12 players.'); return; }
-
-  try{
-    gameStarted=true;
-
-    players=list.slice(); initialOrder=list.slice(); knownVoters=list.slice();
-    for(i=0;i<players.length;i++){
-      var p=players[i]; keys[p]=[]; if(!stats[p]) stats[p]={social:8,challenge:8}; if(!rel[p]) rel[p]={};
-      duelWins[p]=0; duelLosses[p]=0; keysEarned[p]={P1:0,P2:0}; votesGiven[p]=0; votesReceived[p]=0; juryKeysReceived[p]=0;
-      if(!cast[p]) cast[p]={photo:'',color:'#7aa2ff'};
-    }
-
-    statsBox.style.display='none'; relsPreBox.style.display='none'; document.getElementById('castBox').style.display='none';
-
-    newEpisode('Episode 1 (Phase 1 R1)'); pushScene('Events'); log('Phase 1 begins: The Key Quest starts now.');
-
-    generateAlliances(); updateAlliances(); updateProgress(); renderMasterVoteTable(); renderRelsLive();
-
-    startBtn.style.display='none'; nextBtn.style.display='inline-block'; nextBtn.textContent='Next'; nextBtn.onclick=nextRound;
-    document.getElementById('openEpisodes').style.display='inline-block';
-
-    nextRound();
-
-  }catch(err){
-    log('[Error during Start Game] '+(err && err.message? err.message : err));
-    console.error(err);
-    gameStarted=false;
-    statsBox.style.display=''; relsPreBox.style.display=''; document.getElementById('castBox').style.display='';
-  }
-}
-
-function nextRound(){
-  clearLog();
-  try{
-    if(phase===1) runPhase1();
-    else if(phase===2) runPhase2();
-    else if(phase===3) runPhase3();
-    else if(phase===4) runFinale();
-    renderEpisodesButton();
-  }catch(err){
-    log('[Error during Next] '+(err && err.message? err.message : err));
-    console.error(err);
-  }
-}
-
-function endGameUI(){
-  nextBtn.textContent='Simulate Again';
-  nextBtn.onclick=function(){ location.reload(); };
-  document.getElementById('openSeasonRecap').style.display='inline-block';
-  document.getElementById('openStats').style.display='inline-block';
-}
-
-/* ===== Voting Core ===== */
-function simulateVote(voters, eligible){
-  var out=[];
-  for(var i=0;i<voters.length;i++){
-    var v=voters[i];
-    var choices=eligible.filter(function(p){return p!==v});
-    var al=choices.filter(function(c){return inAlliance(v,c)});
-    var prioritize = al.length>0 && Math.random()<ALLY_PREFERENCE_RATE;
-    var pool = prioritize? al : choices;
-    var baseAlpha = prioritize? ALPHA_SOCIAL : 0.5*ALPHA_SOCIAL;
-    var weights = pool.map(function(c){
-      var s=(stats[c]?stats[c].social:8);
-      var j=VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN);
-      var rf=relFactor(v,c);
-      return Math.pow(s,baseAlpha)*j*rf;
-    });
-    var pick=weightedChoice(pool,weights);
-    votesGiven[v]++; votesReceived[pick]++;
-    out.push([v,pick]);
-  }
-  return out;
-}
-function tally(votePairs, eligible){
-  var counts={}, i; for(i=0;i<eligible.length;i++) counts[eligible[i]]=0;
-  for(i=0;i<votePairs.length;i++){ var to=votePairs[i][1]; if(counts.hasOwnProperty(to)) counts[to]++; }
-  var max=-Infinity, k; for(k in counts){ if(counts[k]>max) max=counts[k]; }
-  var tied=[]; for(k in counts){ if(counts[k]===max) tied.push(k); }
-  return [tied[0], tied, counts];
-}
-function addVoteColumn(label,phaseTag,roundNo,voters,votePairs,result,lockUser){
-  var values={}, i; for(i=0;i<knownVoters.length;i++) values[knownVoters[i]]='—';
-  for(i=0;i<votePairs.length;i++){ var v=votePairs[i][0], to=votePairs[i][1]; values[v]=to; }
+/* Voting Matrix */
+function addVoteColumn(label, voters, pairs, result, lockUser){
+  const values={}; voters.forEach(v=>values[v]='—'); eliminated.forEach(v=>{ if(values[v]==null) values[v]='—'; });
+  pairs.forEach(([v,to])=> values[v]=to);
   if(lockUser) values[lockUser]='LOCKPICK';
-  voteColumns.push({label:label,phaseTag:phaseTag,roundNo:roundNo,result:result,values:values});
+  voteColumns.push({label,values,result});
   renderMasterVoteTable();
 }
 function renderMasterVoteTable(){
-  var wrap=document.getElementById('votingMatrix');
-  var html='<div class="table-scroll"><table><thead><tr><th>Voter</th>';
-  for(var i=0;i<voteColumns.length;i++){ html+='<th>'+voteColumns[i].label+'</th>'; }
-  html+='</tr></thead><tbody>';
-  var active=players.slice();
-  var p3=eliminated.filter(function(n){return getElimPhase(n)===3});
-  var p2=eliminated.filter(function(n){return getElimPhase(n)===2});
-  var p1=eliminated.filter(function(n){return getElimPhase(n)===1});
-  function row(name){
-    html+='<tr><td>'+name+'</td>';
-    for(var c=0;c<voteColumns.length;c++){ html+='<td>'+(voteColumns[c].values[name]||'—')+'</td>'; }
-    html+='</tr>';
-  }
-  for(i=0;i<active.length;i++) row(active[i]);
-  for(i=0;i<p3.length;i++) row(p3[i]);
-  for(i=0;i<p2.length;i++) row(p2[i]);
-  for(i=0;i<p1.length;i++) row(p1[i]);
-  html+='<tr><th>Result</th>';
-  for(i=0;i<voteColumns.length;i++){ html+='<th>'+(voteColumns[i].result||'')+'</th>'; }
-  html+='</tr></tbody></table></div>';
+  const wrap=document.getElementById('votingMatrix');
+  let html='<div style="overflow:auto"><table><thead><tr><th>Voter</th>';
+  voteColumns.forEach(c=> html+=`<th>${c.label}</th>`); html+='</tr></thead><tbody>';
+  const active=players.slice(), p3=eliminated.filter(n=>getElimPhase(n)===3), p2=eliminated.filter(n=>getElimPhase(n)===2), p1=eliminated.filter(n=>getElimPhase(n)===1);
+  const row=(name)=>{ html+=`<tr><td>${name}</td>`; voteColumns.forEach(c=> html+=`<td>${c.values[name]||'—'}</td>`); html+='</tr>'; };
+  active.forEach(row); p3.forEach(row); p2.forEach(row); p1.forEach(row);
+  html+='<tr><th>Result</th>'; voteColumns.forEach(c=> html+=`<th>${c.result||''}</th>`); html+='</tr></tbody></table></div>';
   wrap.innerHTML=html;
 }
 
-/* ===== Alliances (fluid) ===== */
-function generateAlliances(){
-  alliances={};
-  var count=Math.floor(Math.random()*3)+2; // 2..4
-  var names='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').slice(0,count);
-  var sh=shuffle(players);
-  for(var i=0;i<names.length;i++) alliances[names[i]]=[];
-  for(i=0;i<sh.length;i++){ alliances[names[i%count]].push(sh[i]); }
-  for(i=0;i<players.length;i++){
-    var p=players[i];
-    if(Math.random()<0.15){
-      var other=names[Math.floor(Math.random()*names.length)];
-      if(alliances[other].indexOf(p)===-1) alliances[other].push(p);
-    }
+/* Jury Matrix */
+function displayJuryMatrix(matrix){
+  const area=document.getElementById('juryMatrix');
+  if(!finalists.length){ area.innerHTML='<div class="hint">No finalists yet.</div>'; return; }
+  let html = `<div style="overflow:auto"><table><tr><th>Juror</th>`;
+  finalists.forEach(f => html += `<th>${f}</th>`);
+  html += `<th>Total</th></tr>`;
+  for(const juror in matrix){
+    html += `<tr><td>${juror}</td>`;
+    let sum=0; finalists.forEach(f => { const v=matrix[juror][f]||0; html += `<td>${v}</td>`; sum+=v; });
+    html += `<td>${sum}</td></tr>`;
   }
-}
-function averageRelWithAlliance(p,A){
-  var m=alliances[A].filter(function(x){return x!==p});
-  if(!m.length) return 0;
-  var s=0; for(var i=0;i<m.length;i++) s+=getRel(p,m[i]);
-  return s/m.length;
-}
-function considerAllianceKicks(p){
-  var entries=Object.entries(alliances);
-  for(var i=0;i<entries.length;i++){
-    var name=entries[i][0], list=entries[i][1];
-    if(list.indexOf(p)===-1) continue;
-    if(averageRelWithAlliance(p,name)<-2 && Math.random()<0.5){
-      alliances[name]=list.filter(function(x){return x!==p});
-      queueRelUpdate(p+' is removed from Alliance '+name+' due to frayed relationships.');
-    }
-  }
-  updateAlliances();
-}
-function maybeFormNewAllianceFromBonds(){
-  var free=players.slice();
-  for(var i=0;i<free.length;i++){
-    for(var j=i+1;j<free.length;j++){
-      var a=free[i], b=free[j];
-      if(getRel(a,b)>=4 && !inAlliance(a,b) && Math.random()<0.25){
-        var name=pickNewAllianceName(); alliances[name]=[a,b];
-        var third=null;
-        for(var k=0;k<free.length;k++){
-          var x=free[k]; if(x===a||x===b) continue;
-          if(getRel(a,x)>=3 && getRel(b,x)>=3){ third=x; break; }
-        }
-        if(third) alliances[name].push(third);
-        queueRelUpdate('New Alliance '+name+' forms via strong bonds: '+alliances[name].join(', '));
-        updateAlliances(); return;
-      }
-    }
-  }
-}
-function penalizeNonAllyDuel(decider,opponent,alliesAvail){
-  if(alliesAvail && !inAlliance(decider,opponent)){
-    var allySet={};
-    var lists=Object.values(alliances);
-    for(var i=0;i<lists.length;i++){
-      var L=lists[i];
-      if(L.indexOf(decider)!==-1){
-        for(var j=0;j<L.length;j++){ var x=L[j]; if(x!==decider) allySet[x]=1; }
-      }
-    }
-    for(var name in allySet){ incRel(decider,name,-2); }
-  }
-}
-function pickNewAllianceName(){
-  var A='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  for(var i=0;i<A.length;i++){ if(!alliances[A[i]]) return A[i]; }
-  return 'Z'+Math.floor(Math.random()*99);
-}
-function updateAlliances(){
-  var box=document.getElementById('alliancesList');
-  if(!box) return;
-  box.innerHTML='';
-  var entries=Object.entries(alliances);
-  for(var i=0;i<entries.length;i++){
-    var n=entries[i][0], m=entries[i][1];
-    var vis=m.filter(function(x){return initialOrder.indexOf(x)!==-1});
-    if(vis.length) box.innerHTML+='<strong>Alliance '+n+'</strong>: '+vis.join(', ')+'<br/>';
-  }
+  html += `</table></div>`;
+  area.innerHTML = html;
 }
 
-/* ===== Progress ===== */
-function updateProgress(){
-  var chart=document.getElementById('progressChart');
-  var everyone=players.concat(eliminated.filter(function(p){return players.indexOf(p)===-1}));
-  var html='<div class="table-scroll"><table><tr><th>Player</th><th>P1</th><th>P2</th><th>Final</th></tr>';
-  for(var i=0;i<everyone.length;i++){
-    var p=everyone[i];
-    var p1=(keys[p]&&keys[p].indexOf('P1')!==-1)?'<span class="pill ok">✔</span>':'<span class="pill no">—</span>';
-    var p2=(keys[p]&&keys[p].indexOf('P2')!==-1)?'<span class="pill ok">✔</span>':'<span class="pill no">—</span>';
-    var pf=(finalists.indexOf(p)!==-1)?'<span class="pill ok">✔</span>':'<span class="pill no">—</span>';
-    html+='<tr><td>'+p+'</td><td>'+p1+'</td><td>'+p2+'</td><td>'+pf+'</td></tr>';
-  }
-  html+='</table></div>';
-  chart.innerHTML=html;
+/* Voting & tally (with social + relationships) */
+function simulateVote(voters, eligible){
+  const out=[];
+  voters.forEach(v=>{
+    const choices=eligible.filter(p=>p!==v);
+    const al=choices.filter(c=>inAlliance(v,c));
+    const prioritize = al.length>0 && Math.random()<(ALLY_PREFERENCE_RATE + (SEASON.preset==='loyal'?0.2:(SEASON.preset==='fluid'?0.15:0)));
+    const pool = prioritize? al : choices;
+    const baseAlpha = prioritize? ALPHA_SOCIAL : 0.5*ALPHA_SOCIAL;
+    const pick = weighted(pool, c=>{
+      const s=(stats[c]?.social||8);
+      const j=VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN);
+      return Math.pow(s,baseAlpha)*j*relFactor(v,c);
+    });
+    if(pick){ out.push([v,pick]); votesGiven[v]=(votesGiven[v]||0)+1; votesReceived[pick]=(votesReceived[pick]||0)+1; }
+  });
+  return out;
+}
+function tally(votePairs, eligible){
+  const counts={}; eligible.forEach(p=>counts[p]=0);
+  votePairs.forEach(([_,votee])=>{ if(counts[votee]!=null) counts[votee]++; });
+  const max=Math.max(...Object.values(counts)); const tied=Object.keys(counts).filter(p=>counts[p]===max);
+  return [tied[0], tied, counts];
 }
 
-/* ===== Episodes helper ===== */
-function snapshotRelAverages(){
-  var names=players.concat(eliminated).concat(jury.map(function(j){return j.name}));
-  var seen={}, uniq=[]; for(var i=0;i<names.length;i++){ if(!seen[names[i]]){ seen[names[i]]=1; uniq.push(names[i]); } }
-  var avg={}, n, others, vals, s;
-  for(i=0;i<uniq.length;i++){
-    n=uniq[i]; others=uniq.filter(function(x){return x!==n}); vals=[];
-    for(var j=0;j<others.length;j++){ vals.push(getRel(n,others[j])); }
-    s=0; for(j=0;j<vals.length;j++) s+=vals[j];
-    avg[n]=vals.length? s/vals.length : 0;
+/* Social Events */
+function triggerSocialEvents(tag){
+  if(!players.length) return;
+  const num = Math.floor(Math.random()*3);
+  for(let k=0;k<num;k++){
+    const a = players[Math.floor(Math.random()*players.length)];
+    let b = players[Math.floor(Math.random()*players.length)];
+    if(a===b) continue;
+    const ev = weighted(EVENT_LIBRARY, e=>e.w);
+    const delta = (ev.type==='bond')? +1 : -1;
+    setRel(a,b, clamp(getRel(a,b)+delta,-5,5));
+    addScene(`Event • ${tag}: ${ev.text(a,b)}`);
   }
-  relTimeline.push({episode:episodes.length, avgRelByPlayer:avg});
+  renderRelsLive();
 }
 
-/* ===== Phase 1 (now multi‑step with post‑vote pause) ===== */
-function runPhase1(){
-  // completion gate
-  var p1Count=0, pk=Object.values(keys);
-  for(var i=0;i<pk.length;i++){ if(pk[i].indexOf && pk[i].indexOf('P1')!==-1) p1Count++; }
-  if(round>4 || p1Count>=8){ endPhase1(); return; }
-
-  if (p1Step===0){
-    newEpisode('Episode '+(episodes.length+1)+' (Phase 1 R'+round+')'); pushScene('Events');
-    flushRelUpdates('Pre‑round relationship updates');
-
-    var eligible=players.filter(function(p){return keys[p].indexOf('P1')===-1});
-    p1_drawn = shuffle(eligible).slice(0,4);
-    log('Phase 1 – Round '+round); log('Drawn: '+p1_drawn.join(', '));
-
-    var beastInDrawn=false;
-    for(i=0;i<p1_drawn.length;i++){ if((stats[p1_drawn[i]]?stats[p1_drawn[i]].challenge:8)>=13){ beastInDrawn=true; break; } }
-    var findChance=0.33 + (beastInDrawn?0.01:0);
-    if(!lockpickFound && Math.random()<findChance){ lockpickHolder=p1_drawn[Math.floor(Math.random()*p1_drawn.length)]; lockpickFound=true; log(lockpickHolder+' discovers the Lockpick.'); }
-
-    p1_votePairs = simulateVote(knownVoters,p1_drawn);
-    var tr=tally(p1_votePairs,p1_drawn); p1_voteWinner=tr[0];
-
-    // log results & lockpick decision here
-    p1_lockUser=null;
-    if(lockpickHolder && !lockpickUsed && p1_drawn.indexOf(lockpickHolder)!==-1){
-      var mustUse=(round===4 && keys[lockpickHolder].indexOf('P1')===-1);
-      var willUse=mustUse || Math.random()<0.2;
-      if(willUse){ p1_voteWinner=lockpickHolder; p1_lockUser=lockpickHolder; lockpickUsed=true; log(lockpickHolder+' uses the Lockpick to override the vote.'); }
-    }
-    addVoteColumn('P1 R'+round,'P1',round,knownVoters,p1_votePairs,p1_voteWinner,p1_lockUser);
-    keys[p1_voteWinner].push('P1'); if(!keysEarned[p1_voteWinner]) keysEarned[p1_voteWinner]={P1:0,P2:0}; keysEarned[p1_voteWinner].P1++;
-    log(p1_voteWinner+' wins the vote key.');
-
-    // We intentionally delay the +bond nudges until the next step
-    for(i=0;i<p1_votePairs.length;i++){ var v=p1_votePairs[i][0], to=p1_votePairs[i][1]; if(to===p1_voteWinner && inAlliance(v,p1_voteWinner)) incRel(v,p1_voteWinner,+1); }
-
-    p1Step=1; return;
+/* Relationship ripple helpers */
+function postVoteRelChanges(winner, group, votePairs){
+  const bumps=[], drops=[];
+  const targetedBy = votePairs.filter(([_,to])=>to===winner).map(([v,_])=>v);
+  targetedBy.forEach(v=>{ if(inAlliance(v,winner)){ setRel(v,winner, clamp(getRel(v,winner)+1,-5,5)); bumps.push(`${v}→${winner} +1 (alliance support)`); }});
+  group.filter(p=>p!==winner).forEach(p=>{ if(!inAlliance(p,winner)){ setRel(p,winner, clamp(getRel(p,winner)-1,-5,5)); drops.push(`${p}→${winner} -1 (resentment)`); }});
+  renderRelsLive();
+  addScene((!bumps.length&&!drops.length)?'No noticeable post‑vote ripples.'
+    :`Post‑vote ripples — Bonds: ${bumps.join(' • ')||'—'} | Tensions: ${drops.join(' • ')||'—'}`);
+}
+function postPickRelChanges(picker,picks,hadAllyOption){
+  const bumps=[], drops=[];
+  picks.forEach(o=>{
+    if(inAlliance(picker,o)){ setRel(picker,o, clamp(getRel(picker,o)+1,-5,5)); bumps.push(`${picker}→${o} +1 (ally)`); }
+    else { setRel(picker,o, clamp(getRel(picker,o)-1,-5,5)); drops.push(`${picker}→${o} -1 (target)`); }
+  });
+  if(hadAllyOption && picks.every(o=>!inAlliance(picker,o))){
+    const allies = players.filter(p=>p!==picker && inAlliance(picker,p));
+    allies.forEach(a=> setRel(picker,a, clamp(getRel(picker,a)-1,-5,5)));
+    if(allies.length) drops.push(`${picker}→allies (${allies.join(', ')}) -1 (snub)`);
   }
+  renderRelsLive();
+  addScene((!bumps.length&&!drops.length)?'No noticeable post‑pick ripples.'
+    :`Post‑pick ripples — Bonds: ${bumps.join(' • ')||'—'} | Tensions: ${drops.join(' • ')||'—'}`);
+}
 
-  if (p1Step===1){
-    flushRelUpdates('Post‑vote updates');
-    p1Step=2; return;
-  }
+/* Jury Keys: concentrated but close */
+function distributeJuryKeys(finalists, jury, finalistKeys){
+  const jm={}; jury.forEach(j=>{ jm[j.name]={}; finalists.forEach(f=>jm[j.name][f]=0); });
+  const softmax=(obj,t=1)=>{ const vals=finalists.map(f=>obj[f]/t); const m=Math.max(...vals);
+    const exps=vals.map(v=>Math.exp(v-m)); const Z=exps.reduce((a,b)=>a+b,0); const p={}; finalists.forEach((f,i)=>p[f]=exps[i]/Z); return p; };
 
-  if (p1Step===2){
-    var challengers=p1_drawn.filter(function(p){return p!==p1_voteWinner && keys[p].indexOf('P1')===-1});
-    if(challengers.length>0){
-      p1_challengeWinner=weightedChoice(challengers,function(p){return Math.pow((stats[p]?stats[p].challenge:8),BETA_CHALLENGE)});
-      keys[p1_challengeWinner].push('P1'); keysEarned[p1_challengeWinner].P1++; log(p1_challengeWinner+' wins the challenge key.');
+  jury.forEach(j=>{
+    const cap = (j.phase===1?1:(j.phase===2?2:3)); // Alt: P3 losers give 3 each
+    const base={}; finalists.forEach(f=>{
+      const allianceBoost = 1.0; // could wire alliance/jury memory here
+      const socialBoost = 0.12*(stats[f]?.social||8);
+      const jitter=0.9+Math.random()*0.2;
+      base[f]=allianceBoost*(1+socialBoost)*jitter;
+    });
+    const probs=softmax(base,1);
+    const ranked=finalists.slice().sort((a,b)=>probs[b]-probs[a]);
+    const top=ranked[0], second=ranked[1];
+
+    let pAll = (j.phase===3 ? 0.72 : j.phase===2 ? 0.62 : 0.5); // more concentration late
+    if (probs[second]>0 && (probs[top]/probs[second]) < 1.1) pAll -= 0.15; // close race → more splitting
+    pAll = clamp(pAll, 0.25, 0.85);
+
+    if(Math.random()<pAll){
+      jm[j.name][top]+=cap; finalistKeys[top]+=cap;
     }else{
-      p1_challengeWinner=null; log('No challenge key awarded.');
-    }
-    p1Step=3; return;
-  }
-
-  if (p1Step===3){
-    maybeFormNewAllianceFromBonds();
-    flushRelUpdates('Post‑challenge updates');
-    updateProgress(); renderRelsLive(); updateAlliances();
-    snapshotRelAverages();
-    round++; p1Step=0;
-  }
-}
-function endPhase1(){
-  var adv=players.filter(function(p){return keys[p].indexOf('P1')!==-1});
-  var out=players.filter(function(p){return adv.indexOf(p)===-1});
-  for(var i=0;i<out.length;i++){ if(eliminated.indexOf(out[i])===-1) eliminated.push(out[i]); jury.push({name:out[i],phase:1}); }
-  players=adv.slice();
-  log('Phase 1 complete. Eliminated: '+out.join(', '));
-  renderMasterVoteTable(); updateAlliances(); renderRelsLive();
-  round=1; phase=2; p2Step=0; nextRound();
-}
-
-/* ===== Phase 2 (now 6 steps with post‑vote & post‑pick pauses) ===== */
-function runPhase2(){
-  // completion gate
-  var p2Count=0, pk=Object.values(keys);
-  for(var i=0;i<pk.length;i++){ if(pk[i].indexOf && pk[i].indexOf('P2')!==-1) p2Count++; }
-  if(round>4 || p2Count>=4){ endPhase2(); return; }
-
-  if (p2Step===0){
-    newEpisode('Episode '+(episodes.length+1)+' (Phase 2 R'+round+')'); pushScene('Events');
-    flushRelUpdates('Pre‑round relationship updates');
-
-    log('Phase 2 – Round '+round);
-    p2_noKey=players.filter(function(p){return keys[p].indexOf('P2')===-1});
-    if(p2_noKey.length<2){ log('Not enough no‑key players for another duel.'); endPhase2(); return; }
-
-    p2_votePairs=simulateVote(players,p2_noKey);
-    var tr=tally(p2_votePairs,p2_noKey); p2_voteWinner=tr[0];
-
-    // winner announcement and lockpick decision occur on this "results" step
-    p2_lockUser=null;
-    if(lockpickHolder && !lockpickUsed && p2_noKey.indexOf(lockpickHolder)!==-1 && keys[lockpickHolder].indexOf('P2')===-1){
-      if(Math.random()<0.6){ p2_voteWinner=lockpickHolder; p2_lockUser=lockpickHolder; lockpickUsed=true; log(lockpickHolder+' uses the Lockpick to auto‑win the vote.'); }
-    }
-    addVoteColumn('P2 R'+round,'P2',round,knownVoters,p2_votePairs,p2_voteWinner,p2_lockUser);
-    log(p2_voteWinner+' wins the vote and will choose a duel opponent.');
-
-    // queue allied support nudges to show in next step
-    for(var i=0;i<p2_votePairs.length;i++){ var v=p2_votePairs[i][0], to=p2_votePairs[i][1]; if(to===p2_voteWinner && inAlliance(v,p2_voteWinner)) incRel(v,p2_voteWinner,+1); }
-
-    p2Step=1; return;
-  }
-
-  if (p2Step===1){
-    // post‑vote only
-    flushRelUpdates('Post‑vote updates');
-    p2Step=2; return;
-  }
-
-  if (p2Step===2){
-    // choose opponent, announce reason
-    p2_candidates=p2_noKey.filter(function(p){return p!==p2_voteWinner});
-    p2_allies=p2_candidates.filter(function(p){return inAlliance(p,p2_voteWinner)});
-    p2_nonAllies=p2_candidates.filter(function(p){return !inAlliance(p,p2_voteWinner)});
-    p2_opponent=null; p2_reason=''; var alliesAvail=p2_allies.length>0;
-
-    if(p2_allies.length && Math.random()<0.55){
-      p2_opponent=weightedChoice(p2_allies,function(p){return 1/Math.max(1,(stats[p]?stats[p].challenge:8))*relFactor(p2_voteWinner,p)});
-      p2_reason='keeps the key within their alliance'; incRel(p2_voteWinner,p2_opponent,+2);
-    } else if(p2_nonAllies.length){
-      p2_opponent=weightedChoice(p2_nonAllies,function(p){return Math.pow(1/Math.max(1,(stats[p]?stats[p].challenge:8)),GAMMA_BEATABLE)*relFactor(p2_voteWinner,p)});
-      p2_reason='chooses someone they believe they can beat'; if(alliesAvail) penalizeNonAllyDuel(p2_voteWinner,p2_opponent,true);
-    } else {
-      p2_opponent=weightedChoice(p2_candidates,function(p){return relFactor(p2_voteWinner,p)}); p2_reason='makes a neutral pick';
-    }
-    log(p2_voteWinner+' chooses to duel '+p2_opponent+' — '+p2_reason+'.');
-    p2Step=3; return;
-  }
-
-  if (p2Step===3){
-    // post‑pick only
-    flushRelUpdates('Post‑pick updates');
-    p2Step=4; return;
-  }
-
-  if (p2Step===4){
-    // duel resolution
-    var pWin=duelWinProb(p2_voteWinner,p2_opponent);
-    p2_duelWinner=Math.random()<pWin ? p2_voteWinner : p2_opponent;
-    p2_duelLoser=(p2_duelWinner===p2_voteWinner)?p2_opponent:p2_voteWinner;
-    keys[p2_duelWinner].push('P2'); if(!keysEarned[p2_duelWinner]) keysEarned[p2_duelWinner]={P1:0,P2:0}; keysEarned[p2_duelWinner].P2++;
-    duelWins[p2_duelWinner]=(duelWins[p2_duelWinner]||0)+1; duelLosses[p2_duelLoser]=(duelLosses[p2_duelLoser]||0)+1;
-    log(p2_duelWinner+' wins the duel and earns a Phase 2 key.');
-    p2Step=5; return;
-  }
-
-  if (p2Step===5){
-    // wrap & relationship fallout
-    considerAllianceKicks(p2_voteWinner); maybeFormNewAllianceFromBonds();
-    flushRelUpdates('Post‑duel updates');
-    updateProgress(); renderRelsLive(); updateAlliances(); snapshotRelAverages();
-    round++; p2Step=0;
-  }
-}
-function endPhase2(){
-  var adv=players.filter(function(p){return keys[p].indexOf('P2')!==-1});
-  var out=players.filter(function(p){return adv.indexOf(p)===-1});
-  for(var i=0;i<out.length;i++){ if(eliminated.indexOf(out[i])===-1) eliminated.push(out[i]); jury.push({name:out[i],phase:2}); }
-  players=adv.slice();
-  log('Phase 2 complete. Eliminated: '+out.join(', '));
-  renderMasterVoteTable(); renderRelsLive(); updateAlliances();
-  round=1; phase=3; phase3Step=0; nextRound();
-}
-
-/* ===== Phase 3 (unchanged two‑step with its own small pauses) ===== */
-var p3_voteWinner=null, p3_chosenAlly=null, p3_duelists=[];
-function runPhase3(){
-  if(phase3Step===0){
-    newEpisode('Episode '+(episodes.length+1)+' (Phase 3 Vote)'); pushScene('Events');
-    flushRelUpdates('Pre‑vote updates');
-
-    log('Phase 3 — Final Cut: Vote step');
-
-    var raw=simulateVote(players,players);
-    var votePairs=[];
-    for(var i=0;i<raw.length;i++){
-      var v=raw[i][0], to=raw[i][1];
-      if(v===to){
-        var choices=players.filter(function(p){return p!==v});
-        var choice=weightedChoice(choices, choices.map(function(c){
-          var s=(stats[c]?stats[c].social:8);
-          var j=VOTE_JITTER_MIN + Math.random()*(VOTE_JITTER_MAX - VOTE_JITTER_MIN);
-          return Math.pow(s,ALPHA_SOCIAL)*j*relFactor(v,c);
-        }));
-        votePairs.push([v,choice]);
-      } else {
-        votePairs.push([v,to]);
+      for(let k=0;k<cap;k++){
+        const pNow=softmax(base,1.05);
+        const pick=weighted(finalists,f=>pNow[f]);
+        jm[j.name][pick]+=1; finalistKeys[pick]+=1; base[pick]*=0.94;
       }
     }
-    var tr=tally(votePairs,players); var voteWinner=tr[0];
-
-    // Final 4 tie rules
-    if(players.length===4){
-      var cm={}, k; for(i=0;i<players.length;i++) cm[players[i]]=0;
-      for(i=0;i<votePairs.length;i++) cm[votePairs[i][1]]++;
-      var vals=Object.values(cm), maxV=Math.max.apply(null, vals);
-      var tiedTop=Object.keys(cm).filter(function(p){return cm[p]===maxV});
-      var allEqual=true; for(i=0;i<vals.length-1;i++){ if(vals[i]!==vals[i+1]){ allEqual=false; break; } }
-      if(allEqual){
-        log('Final 4 vote is a four‑way tie! All four compete; top three advance.');
-        var perf=players.map(function(p){ return {p:p, score:(stats[p]?stats[p].challenge:8)*(0.8+Math.random()*0.4)}; });
-        perf.sort(function(a,b){return b.score-a.score});
-        var advancing=[perf[0].p, perf[1].p, perf[2].p], fourth=perf[3].p;
-        finalists=advancing.slice(); jury.push({name:fourth,phase:3}); if(eliminated.indexOf(fourth)===-1) eliminated.push(fourth);
-        log('Challenge order: '+perf.map(function(x){return x.p}).join(' > '));
-        log(fourth+' finishes last and is eliminated; the others advance.');
-        updateProgress(); renderRelsLive(); phase=4; snapshotRelAverages(); return;
-      }
-      if(tiedTop.length===2){
-        var nonTied=players.filter(function(p){return tiedTop.indexOf(p)===-1}); finalists=nonTied.slice();
-        log('Final 4 vote two‑way tie between '+tiedTop[0]+' and '+tiedTop[1]+'. They duel for the final spot. Others advance: '+nonTied.join(', ')+'.');
-        var a=tiedTop[0], b=tiedTop[1], pWin=duelWinProb(a,b);
-        var dW=Math.random()<pWin?a:b, dL=(dW===a?b:a);
-        finalists.push(dW); jury.push({name:dL,phase:3}); if(eliminated.indexOf(dL)===-1) eliminated.push(dL); duelWins[dW]++; duelLosses[dL]++;
-        log(dW+' wins the tiebreak duel. '+dL+' is eliminated and becomes the 4th juror.');
-        updateProgress(); renderRelsLive(); phase=4; snapshotRelAverages(); return;
-      }
-    }
-
-    p3_voteWinner=voteWinner; log(voteWinner+' wins the vote and becomes a finalist.');
-    var available=players.filter(function(p){return p!==voteWinner});
-    var ally=available.filter(function(p){return inAlliance(p,voteWinner)});
-    var pool=ally.length? ally : available;
-    p3_chosenAlly=weightedChoice(pool, function(p){ var soc=(stats[p]?stats[p].social:8); var ch=(stats[p]?stats[p].challenge:8); return (soc+0.1*(16-ch))*relFactor(voteWinner,p); });
-    if(inAlliance(voteWinner,p3_chosenAlly)) incRel(voteWinner,p3_chosenAlly,+2);
-    addVoteColumn('P3 Vote','P3',1,knownVoters,votePairs,voteWinner,null);
-
-    p3_duelists=players.filter(function(p){return p!==voteWinner && p!==p3_chosenAlly});
-    flushRelUpdates('Post‑selection updates');
-
-    log(voteWinner+' selects '+p3_chosenAlly+' to join them. Next: '+p3_duelists[0]+' vs '+p3_duelists[1]+' for the last spot. Click Next to resolve.');
-    finalists=[p3_voteWinner,p3_chosenAlly]; updateProgress(); renderRelsLive(); phase3Step=1; snapshotRelAverages(); return;
-  }
-
-  if(phase3Step===1){
-    newEpisode('Episode '+(episodes.length+1)+' (Phase 3 Duel)'); pushScene('Events');
-    flushRelUpdates('Pre‑duel updates');
-
-    var a=p3_duelists[0], b=p3_duelists[1], pWin=duelWinProb(a,b);
-    var dW=Math.random()<pWin?a:b, dL=(dW===a?b:a);
-    finalists.push(dW); if(eliminated.indexOf(dL)===-1) eliminated.push(dL);
-    jury.push({name:dL,phase:3}); duelWins[dW]++; duelLosses[dL]++;
-    log(dW+' wins the final duel. '+dL+' is eliminated and joins the jury.');
-    flushRelUpdates('Post‑duel updates');
-
-    updateProgress(); renderRelsLive(); phase=4; phase3Step=0; log('Click Next to proceed to the Vault Finale.'); snapshotRelAverages();
-  }
-}
-
-/* ===== Finale (3 screens) ===== */
-function runFinale(){
-  if(finaleStep===0){
-    newEpisode('Episode '+(episodes.length+1)+' (Finale — Jury)'); pushScene('Events'); flushRelUpdates('Pre‑jury updates');
-    if(!finaleState.finalistKeys){
-      finaleState.finalistKeys={}; for(var i=0;i<finalists.length;i++) finaleState.finalistKeys[finalists[i]]=3;
-      var supportScore={}, f;
-      for(i=0;i<finalists.length;i++){ f=finalists[i]; var s=0;
-        for(var j=0;j<jury.length;j++){ var cap=(jury[j].phase===1?1:(jury[j].phase===2?2:4)); if(inAlliance(jury[j].name,f)) s+=cap; }
-        supportScore[f]=s + 0.4*(stats[f]?stats[f].social:8);
-      }
-      var expect={}, maxS=1; for(f in supportScore){ if(supportScore[f]>maxS) maxS=supportScore[f]; }
-      for(f in supportScore){ expect[f]=Math.round(6 + (supportScore[f]/maxS)*6); }
-      finaleState.chosenVaults=pickUniqueVaultsForFinalists(expect);
-      finaleState.juryMatrix=distributeJuryKeysExact16(finalists,jury,finaleState.finalistKeys);
-      for(i=0;i<finalists.length;i++){ f=finalists[i]; juryKeysReceived[f]=(finaleState.finalistKeys[f]-3); }
-    }
-    log('Vault Finale — Jury awards keys now.');
-    displayJuryMatrix(finaleState.juryMatrix);
-    log('Click Next to reveal vault openings.');
-    finaleStep=1; snapshotRelAverages(); return;
-  }
-
-  if(finaleStep===1){
-    newEpisode('Episode '+(episodes.length+1)+' (Finale — Open Vaults)'); pushScene('Events'); flushRelUpdates('Pre‑open updates');
-    var s1=[]; for(var i=0;i<finalists.length;i++){ var f=finalists[i]; s1.push(f+' → '+finaleState.chosenVaults[f]+' keys'); }
-    log('Vault selections: '+s1.join(', '));
-    for(i=0;i<finalists.length;i++){ f=finalists[i]; log(f+' has '+finaleState.finalistKeys[f]+' total keys.'); }
-    var result=finalists.map(function(n){return {name:n,keys:finaleState.finalistKeys[n],vault:finaleState.chosenVaults[n]}});
-    result.sort(function(a,b){return b.vault-a.vault});
-    finaleState.resultList=result; finaleState.winner=null;
-    for(i=0;i<result.length;i++){ if(result[i].keys>=result[i].vault){ finaleState.winner=result[i]; break; } }
-    log('Click Next to reveal the winner.');
-    finaleStep=2; snapshotRelAverages(); return;
-  }
-
-  if(finaleStep===2){
-    newEpisode('Episode '+(episodes.length+1)+' (Finale — Winner)'); pushScene('Events'); flushRelUpdates('Pre‑reveal updates');
-    if(!finaleState.winner){
-      var fourth=null; for(var i=0;i<jury.length;i++){ if(jury[i].phase===3){ fourth=jury[i].name; break; } }
-      log('No finalist opened a vault. '+(fourth||'Fourth Place')+' wins by default.');
-    } else {
-      log(finaleState.winner.name+' opens the '+finaleState.winner.vault+'‑key vault with '+finaleState.winner.keys+' keys and wins.');
-    }
-    endGameUI(); snapshotRelAverages();
-  }
-}
-
-/* ===== Finale helpers + jury matrix ===== */
-function pickUniqueVaultsForFinalists(expect){
-  var picked={}, avail=vaults.slice();
-  var order=Object.keys(expect).sort(function(a,b){return expect[b]-expect[a]});
-  for(var i=0;i<order.length;i++){
-    var f=order[i], best=avail[0], bestDiff=Infinity, bestIdx=0;
-    for(var j=0;j<avail.length;j++){ var v=avail[j], d=Math.abs(v-expect[f]); if(d<bestDiff){bestDiff=d; best=v; bestIdx=j;} }
-    picked[f]=best; avail.splice(bestIdx,1);
-  }
-  return picked;
-}
-function distributeJuryKeysExact16(finalists,jury,finalistKeys){
-  var capPool=[], i,j;
-  for(i=0;i<jury.length;i++){ var cap=(jury[i].phase===1?1:(jury[i].phase===2?2:4)); for(j=0;j<cap;j++) capPool.push(jury[i].name); }
-  capPool=shuffle(capPool); var draws=capPool.slice(0,16);
-  var jm={}, f; for(i=0;i<jury.length;i++){ var name=jury[i].name; jm[name]={}; for(j=0;j<finalists.length;j++){ jm[name][finalists[j]]=0; } }
-
-  function allianceSupportForFinalist(f){
-    var s=0; for(var k=0;k<jury.length;k++){ var cap=(jury[k].phase===1?1:(jury[k].phase===2?2:4)); if(inAlliance(jury[k].name,f)) s+=cap; } return s;
-  }
-  var base={}, top=-Infinity, sec=-Infinity;
-  for(i=0;i<finalists.length;i++){ f=finalists[i]; base[f]=allianceSupportForFinalist(f) + 0.6*(stats[f]?stats[f].social:8); if(base[f]>top){ sec=top; top=base[f]; } else if(base[f]>sec){ sec=base[f]; } }
-  function smoothProbs(str){
-    var T; var disp=(top-sec)/(top||1);
-    if(disp>=0.5) T=0.55; else if(disp>=0.25) T=0.7; else T=0.9;
-    var exp={}, sum=0, f;
-    for(f in str){ exp[f]=Math.exp(str[f]/T); sum+=exp[f]; }
-    var probs={}, uni=1/finalists.length, lambda=(disp>=0.5)?0.05:(disp>=0.25?0.18:0.35);
-    for(f in str){ probs[f]=((exp[f]/sum)*(1-lambda)) + (lambda*uni); }
-    return probs;
-  }
-  var baseProbs=smoothProbs(base);
-
-  for(i=0;i<draws.length;i++){
-    var jName=draws[i];
-    var probs={}, f; for(f in baseProbs) probs[f]=baseProbs[f];
-    var allied=finalists.filter(function(ff){return inAlliance(jName,ff)});
-    if(allied.length===1){ probs[allied[0]]*=1.15; var s=0; for(f in probs) s+=probs[f]; for(f in probs) probs[f]/=s; }
-    var target=weightedChoice(finalists, function(ff){return probs[ff]});
-    jm[jName][target]+=1; finalistKeys[target]+=1;
-  }
+  });
   return jm;
 }
-function displayJuryMatrix(matrix){
-  var area=document.getElementById('juryMatrix'); if(!finalists.length){ area.innerHTML=''; return; }
-  var html='<div class="table-scroll"><table><tr><th>Juror</th>';
-  for(var i=0;i<finalists.length;i++){ html+='<th>'+avatarChip(finalists[i])+'</th>'; }
-  html+='<th>Total</th></tr>';
-  var total=0; for(var juror in matrix){
-    var sum=0; html+='<tr><td>'+avatarChip(juror,true)+'</td>';
-    for(i=0;i<finalists.length;i++){ var f=finalists[i]; var v=(matrix[juror][f]||0); sum+=v; total+=v; html+='<td>'+v+'</td>'; }
-    html+='<td>'+sum+'</td></tr>';
+
+/* ================= Driver ================= */
+function progressGame(){
+  updateAlliances(); updateProgress(); renderRelsLive(); renderEpisodeNav();
+  if(phase===1) return runPhase1();
+  if(phase===2) return runPhase2();
+  if(phase===3) return runPhase3();
+  if(phase===4) return runFinale();
+}
+
+/* ===== Phase 1 (Alt) ===== */
+let p1_lastChanceDone=false;
+function runPhase1(){
+  const p1Count=Object.values(keys).reduce((a,k)=>a+(k.includes?.('P1')?1:0),0);
+
+  // After 8 P1 keys → do the last‑chance vote once, then proceed to P2
+  if(p1Count>=8){
+    if(!p1_lastChanceDone){
+      ensureEpisode();
+      const group = players.filter(p=>!keys[p].includes('P1'));
+      const voters = group.slice(); // only these 5 vote & are targets
+      addScene(`Phase 1 — Last Chance Vote among: ${group.join(', ')}`);
+      const v1 = simulateVote(voters, group);
+      let [w,tied] = tally(v1, group);
+      addVoteColumn(`P1 R5 (vote)`, voters, v1, tied.length===1?w:('TIE:'+tied.join('=')), null);
+      // With 5 voters, revote among tied (tied sit out) is odd → should break
+      while(tied.length>1){
+        const revVoters = voters.filter(v=>!tied.includes(v));
+        const rev = simulateVote(revVoters, tied);
+        [w,tied] = tally(rev, tied);
+        addVoteColumn(`P1 R5 (revote)`, revVoters, rev, tied.length===1?w:('TIE:'+tied.join('=')), null);
+        if(tied.length>1) break; // extremely rare; we’ll fall through
+      }
+      const winner = (tied.length===1? w : tied[Math.floor(Math.random()*tied.length)]);
+      addScene(`${winner} survives and receives a Phase 1 key.`);
+      keys[winner].push('P1'); keysEarned[winner].P1=(keysEarned[winner].P1||0)+1; wins[winner]=(wins[winner]||0)+1;
+      const outs = group.filter(p=>p!==winner);
+      outs.forEach(p=>{ eliminated.push(p); jury.push({name:p,phase:1}); });
+      players = players.filter(p=>!outs.includes(p));
+      p1_lastChanceDone=true; updateProgress(); return;
+    } else {
+      addScene('Phase 1 complete. Advancing: '+players.join(', '));
+      phase=2; round=1; return;
+    }
   }
-  html+='</table></div><div class="hint">Total jury keys distributed: <strong>'+total+'</strong> (should be exactly 16)</div>';
-  area.innerHTML=html;
-}
-function avatarChip(name){
-  var c=cast[name]||{photo:'',color:'#7aa2ff'};
-  var av=c.photo?('<img src="'+c.photo+'" class="avatar" alt="'+name+'">'):'<div class="avatar" style="background:'+c.color+'">'+initials(name)+'</div>';
-  return '<span class="chip" style="border-color:'+c.color+'">'+av+'<span>'+name+'</span></span>';
-}
 
-/* ===== Modals & Recaps ===== */
-function openModal(id){ document.getElementById(id).style.display='flex'; if(id==='episodesModal') renderEpisode(epIndex); }
-function closeModal(id){ document.getElementById(id).style.display='none'; }
-function renderEpisodesButton(){ var b=document.getElementById('openEpisodes'); b.style.display='inline-block'; b.textContent='Episode Recaps ('+episodes.length+')'; if(epIndex<0 && episodes.length) epIndex=0; }
-function setEpIndex(i){ if(!episodes.length) return; epIndex=(i+episodes.length)%episodes.length; renderEpisode(epIndex); }
-function renderEpisode(i){
-  if(i<0||i>=episodes.length) return;
-  var ep=episodes[i], content='';
-  document.getElementById('epTitle').textContent=(i+1)+' / '+episodes.length+' — '+ep.title;
-  for(var s=0;s<ep.scenes.length;s++){
-    var sc=ep.scenes[s]; content+='<div class="box"><h2>'+sc.label+'</h2><pre>'+sc.lines.join('\n')+'</pre></div>';
+  // R1–R4
+  ensureEpisode();
+  if(p1_step===0){
+    const noKey=players.filter(p=>!keys[p].includes('P1'));
+    p1_drawn = (round===4) ? (noKey.length>=7? noKey.slice(0,7) : shuffle(noKey).slice(0,Math.min(6,noKey.length)))
+                           : shuffle(noKey).slice(0, Math.min(6, noKey.length));
+    addScene(`Phase 1 — Round ${round}: Drawn → ${p1_drawn.join(', ')}`);
+
+    triggerSocialEvents('around the draw');
+
+    if(!SEASON.noLockpick && !lockpickFound && Math.random()<0.2 && p1_drawn.length){
+      lockpickHolder=p1_drawn[Math.floor(Math.random()*p1_drawn.length)]; lockpickFound=true; addScene(`${lockpickHolder} discovers the LOCKPICK.`);
+    }
+
+    // All 13 vote among drawn
+    p1_votePairs = simulateVote(players, p1_drawn);
+    let [winner, tied] = tally(p1_votePairs, p1_drawn);
+
+    let lockUser=null;
+    if(!SEASON.noLockpick && lockpickHolder && !lockpickUsed && p1_drawn.includes(lockpickHolder)){
+      if(Math.random()<0.18){ winner=lockpickHolder; lockUser=lockpickHolder; lockpickUsed=true; addScene(`${lockpickHolder} overrides with LOCKPICK!`); }
+    }
+
+    if(tied.length===1){
+      // clear vote winner gets vote key and sits out of challenge
+      p1_voteWinner=winner;
+      addVoteColumn(`P1 R${round} (vote)`, players, p1_votePairs, winner, lockUser);
+      addScene(`${winner} wins the Vote Key and sits out the challenge.`);
+      keys[winner].push('P1'); keysEarned[winner].P1=(keysEarned[winner].P1||0)+1; wins[winner]=(wins[winner]||0)+1;
+
+      // challenge among other drawn without P1
+      const chall = p1_drawn.filter(p=>p!==winner && !keys[p].includes('P1'));
+      if(chall.length){
+        const cw=weighted(chall, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+        addScene(`Challenge: ${chall.join(', ')} → ${cw} wins the Challenge Key.`);
+        keys[cw].push('P1'); keysEarned[cw].P1=(keysEarned[cw].P1||0)+1; wins[cw]=(wins[cw]||0)+1;
+        chall.filter(x=>x!==cw).forEach(l=>losses[l]=(losses[l]||0)+1);
+      } else addScene('No challenge key this round.');
+
+      postVoteRelChanges(p1_voteWinner, p1_drawn, p1_votePairs);
+      round++; updateProgress(); p1_step=0; return;
+    } else {
+      // tie → revote; tied do not vote
+      p1_tiedGroup=tied.slice();
+      const revVoters = players.filter(v=>!p1_tiedGroup.includes(v));
+      const revote = simulateVote(revVoters, p1_tiedGroup);
+      const [rw, tied2] = tally(revote, p1_tiedGroup);
+      addVoteColumn(`P1 R${round} (vote)`, players, p1_votePairs, 'TIE:'+tied.join('='), null);
+      addVoteColumn(`P1 R${round} (revote)`, revVoters, revote, tied2.length===1?rw:('TIE:'+tied2.join('=')), null);
+
+      if(tied2.length===1){
+        // revote breaks
+        p1_voteWinner=rw; addScene(`Revote breaks: ${rw} takes the Vote Key and sits out.`);
+        keys[rw].push('P1'); keysEarned[rw].P1=(keysEarned[rw].P1||0)+1; wins[rw]=(wins[rw]||0)+1;
+
+        const chall = p1_drawn.filter(p=>p!==rw && !keys[p].includes('P1'));
+        if(chall.length){
+          const cw=weighted(chall, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+          addScene(`Challenge: ${chall.join(', ')} → ${cw} wins the Challenge Key.`);
+          keys[cw].push('P1'); keysEarned[cw].P1=(keysEarned[cw].P1||0)+1; wins[cw]=(wins[cw]||0)+1;
+          chall.filter(x=>x!==cw).forEach(l=>losses[l]=(losses[l]||0)+1);
+        } else addScene('No challenge key this round.');
+
+        postVoteRelChanges(p1_voteWinner, p1_drawn, p1_votePairs);
+        round++; updateProgress(); p1_step=0; return;
+      } else {
+        // still tied → ALL drawn (6 or 7) run challenge; winner keeps challenge key AND must give vote key to someone from tied group (not themselves)
+        const challengers = p1_drawn.slice();
+        const cw=weighted(challengers, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+        addScene(`Revote still tied → Full challenge among ${challengers.length}. ${cw} wins Challenge Key and must assign Vote Key to one of [${p1_tiedGroup.join(', ')}].`);
+        keys[cw].push('P1'); keysEarned[cw].P1=(keysEarned[cw].P1||0)+1; wins[cw]=(wins[cw]||0)+1;
+        challengers.filter(x=>x!==cw).forEach(l=>losses[l]=(losses[l]||0)+1);
+
+        let candidates = p1_tiedGroup.filter(x=>x!==cw);
+        if(candidates.length===0) candidates = p1_tiedGroup.slice(); // rare edge if cw was only tied
+        const give = weighted(candidates, c=> (stats[c]?.social||8) * (0.9+Math.random()*0.2) );
+        keys[give].push('P1'); keysEarned[give].P1=(keysEarned[give].P1||0)+1; wins[give]=(wins[give]||0)+1;
+        addScene(`${cw} awards the Vote Key to ${give}.`);
+
+        postVoteRelChanges(give, p1_drawn, p1_votePairs);
+        round++; updateProgress(); p1_step=0; return;
+      }
+    }
   }
-  document.getElementById('epContent').innerHTML=content||'<div class="muted">No scenes captured.</div>';
 }
-function openSeasonModal(){
-  var area=document.getElementById('seasonContent'), html='';
-  for(var i=0;i<episodes.length;i++){
-    var ep=episodes[i]; html+='<div class="box"><h2>Episode '+(i+1)+': '+ep.title+'</h2>';
-    for(var s=0;s<ep.scenes.length;s++){ var sc=ep.scenes[s]; html+='<div class="small" style="margin:6px 0;"><strong>'+sc.label+'</strong></div><pre>'+sc.lines.join('\n')+'</pre>'; }
-    html+='</div>';
+
+/* ===== Phase 2 (Alt) ===== */
+let p2_lastChanceDone=false;
+function runPhase2(){
+  const p2Count=Object.values(keys).reduce((a,k)=>a+(k.includes?.('P2')?1:0),0);
+  if(p2Count>=4){
+    if(!p2_lastChanceDone){
+      ensureEpisode();
+      const group = players.filter(p=>!keys[p].includes('P2'));
+      addScene(`Phase 2 — Last Chance Challenge among: ${group.join(', ')}`);
+      const w = weighted(group, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+      keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1;
+      group.filter(x=>x!==w).forEach(l=>{ eliminated.push(l); jury.push({name:l,phase:2}); losses[l]=(losses[l]||0)+1; });
+      players = players.filter(p=>!group.includes(p) || p===w);
+      addScene(`${w} secures the final Phase 2 key. Others join the jury (P2).`);
+      p2_lastChanceDone=true; updateProgress(); return;
+    } else {
+      addScene('Phase 2 complete. Advancing: '+players.join(', '));
+      phase=3; round=1; return;
+    }
   }
-  area.innerHTML=html||'<div class="muted">No episodes yet.</div>';
-  openModal('seasonModal');
-}
 
-/* ===== Post‑Season Stats ===== */
-function openStatsModal(){
-  var area=document.getElementById('statsContent'), i;
-  var duelHtml='<div class="box"><h2>Duel Records</h2><div class="table-scroll"><table><tr><th>Player</th><th>Wins</th><th>Losses</th></tr>';
-  for(i=0;i<initialOrder.length;i++){ var p=initialOrder[i]; duelHtml+='<tr><td>'+avatarChip(p)+'</td><td>'+(duelWins[p]||0)+'</td><td>'+(duelLosses[p]||0)+'</td></tr>'; }
-  duelHtml+='</table></div></div>';
+  ensureEpisode();
+  if(p2_step===0){
+    addScene(`Phase 2 — Round ${round}`);
+    p2_noP2 = players.filter(p=>!keys[p].includes('P2'));
+    if(p2_noP2.length<2){ addScene('Not enough no‑P2 players; jumping to last‑chance.'); p2_lastChanceDone=false; return; }
 
-  var keyHtml='<div class="box"><h2>Keys Earned</h2><div class="table-scroll"><table><tr><th>Player</th><th>P1</th><th>P2</th><th>Jury Keys Received</th><th>Total Keys (Final)</th></tr>';
-  for(i=0;i<initialOrder.length;i++){
-    var name=initialOrder[i], p1=(keysEarned[name]?keysEarned[name].P1:0), p2=(keysEarned[name]?keysEarned[name].P2:0), jr=(juryKeysReceived[name]||0);
-    var finalTotal=(finalists.indexOf(name)!==-1)?((finaleState.finalistKeys && finaleState.finalistKeys[name])||3):(p1+p2);
-    keyHtml+='<tr><td>'+avatarChip(name)+'</td><td>'+p1+'</td><td>'+p2+'</td><td>'+jr+'</td><td>'+finalTotal+'</td></tr>';
+    p2_votePairs = simulateVote(players, p2_noP2);
+    let [vw, tied] = tally(p2_votePairs, p2_noP2);
+    addVoteColumn(`P2 R${round} (vote)`, players, p2_votePairs, tied.length===1?vw:('TIE:'+tied.join('=')), null);
+
+    if(tied.length===1){
+      p2_voteWinner=vw; addScene(`${vw} wins the vote and must pick a no‑P2 opponent for the duel.`);
+      const cand=p2_noP2.filter(p=>p!==vw);
+      const opp = weighted(cand, c=> Math.pow(1/Math.max(1,(stats[c]?.challenge||8)),GAMMA_BEATABLE));
+      addScene(`${vw} chooses ${opp} (beatable / key‑containment).`);
+      const w = (Math.random()<duelWinProb(vw,opp))? vw : opp;
+      const l = (w===vw?opp:vw);
+      keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1; losses[l]=(losses[l]||0)+1;
+      addScene(`${w} wins the duel and earns a P2 key.`);
+      round++; updateProgress(); return;
+    }
+
+    // Tie handling
+    if(tied.length===2){
+      const revVoters = players.filter(v=>!tied.includes(v));
+      const rev = simulateVote(revVoters, tied);
+      const [w2, tied2] = tally(rev, tied);
+      addVoteColumn(`P2 R${round} (revote)`, revVoters, rev, tied2.length===1?w2:('TIE:'+tied2.join('=')), null);
+      if(tied2.length===1){
+        p2_voteWinner=w2; addScene(`Revote breaks: ${w2} must pick an opponent.`);
+        const cand=p2_noP2.filter(p=>p!==w2);
+        const opp = weighted(cand, c=> Math.pow(1/Math.max(1,(stats[c]?.challenge||8)),GAMMA_BEATABLE));
+        const w = (Math.random()<duelWinProb(w2,opp))? w2 : opp;
+        const l = (w===w2?opp:w2);
+        keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1; losses[l]=(losses[l]||0)+1;
+        addScene(`${w} wins the duel and earns a P2 key.`);
+        round++; updateProgress(); return;
+      } else {
+        // stalemate → duel between the two
+        const a=tied[0], b=tied[1];
+        const w = (Math.random()<duelWinProb(a,b))? a : b;
+        const l = (w===a?b:a);
+        keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1; losses[l]=(losses[l]||0)+1;
+        addScene(`Revote stalemate → Tiebreak duel: ${a} vs ${b} — ${w} earns the P2 key.`);
+        round++; updateProgress(); return;
+      }
+    }
+
+    if(tied.length===3){
+      addScene(`3‑way tie → Triple Duel among ${tied.join(', ')}.`);
+      const w = weighted(tied, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+      keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1;
+      tied.filter(x=>x!==w).forEach(l=>losses[l]=(losses[l]||0)+1);
+      addScene(`${w} wins the triple duel and earns a P2 key.`);
+      round++; updateProgress(); return;
+    }
+
+    if(tied.length===4){
+      // breaker = the one person who didn’t vote for any of the four
+      const tiedSet=new Set(tied);
+      const nonVoters = players.filter(v=>{
+        const pick = (p2_votePairs.find(([vv,_])=>vv===v)||[])[1];
+        return !tiedSet.has(pick);
+      });
+      if(nonVoters.length){
+        const breaker = weighted(nonVoters, c=> (stats[c]?.social||8)*(0.9+Math.random()*0.2));
+        const pick = weighted(tied, c=> (stats[c]?.social||8)*(0.9+Math.random()*0.2));
+        addScene(`4‑way tie → ${breaker} breaks the tie and selects ${pick}.`);
+        // pick chooses opponent and duel
+        const cand=p2_noP2.filter(p=>p!==pick);
+        const opp = cand.length? weighted(cand, c=> Math.pow(1/Math.max(1,(stats[c]?.challenge||8)),GAMMA_BEATABLE)) : null;
+        if(opp){
+          const w = (Math.random()<duelWinProb(pick,opp))? pick : opp;
+          const l = (w===pick?opp:pick);
+          keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1; losses[l]=(losses[l]||0)+1;
+          addScene(`${w} wins the duel and earns a P2 key.`);
+        } else { keys[pick].push('P2'); keysEarned[pick].P2=(keysEarned[pick].P2||0)+1; wins[pick]=(wins[pick]||0)+1; addScene(`${pick} receives P2 key (no opponent available).`); }
+        round++; updateProgress(); return;
+      } else {
+        // fallback: multi-duel
+        const w = weighted(tied, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+        keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1;
+        tied.filter(x=>x!==w).forEach(l=>losses[l]=(losses[l]||0)+1);
+        addScene(`Edge case 4‑tie with no breaker → multi‑duel; ${w} wins P2 key.`);
+        round++; updateProgress(); return;
+      }
+    }
+
+    // large tie → multi-duel
+    const w = weighted(tied, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+    keys[w].push('P2'); keysEarned[w].P2=(keysEarned[w].P2||0)+1; wins[w]=(wins[w]||0)+1;
+    tied.filter(x=>x!==w).forEach(l=>losses[l]=(losses[l]||0)+1);
+    addScene(`Large tie → multi‑duel; ${w} wins P2 key.`);
+    round++; updateProgress(); return;
   }
-  keyHtml+='</table></div></div>';
-
-  var voteHtml='<div class="box"><h2>Votes Given / Received</h2><div class="table-scroll"><table><tr><th>Player</th><th>Given</th><th>Received</th></tr>';
-  for(i=0;i<initialOrder.length;i++){ var nm=initialOrder[i]; voteHtml+='<tr><td>'+avatarChip(nm)+'</td><td>'+(votesGiven[nm]||0)+'</td><td>'+(votesReceived[nm]||0)+'</td></tr>'; }
-  voteHtml+='</table></div></div>';
-
-  var selId='relTimelineSelect';
-  var relCtrl='<div class="box"><h2>Relationship Timeline</h2>'+
-    '<div class="rowwrap" style="align-items:center"><label class="muted">Player</label><select id="'+selId+'">'+initialOrder.map(function(p){return '<option value="'+p+'">'+p+'</option>'}).join('')+'</select></div>'+
-    '<div class="svgwrap"><svg id="relSvg" width="800" height="200" viewBox="0 0 800 200"></svg></div>'+
-    '<div class="small">Average relationship score per episode (−5..+5). Zero line marked.</div></div>';
-
-  area.innerHTML=duelHtml+keyHtml+voteHtml+relCtrl;
-  openModal('statsModal');
-  var select=document.getElementById(selId); select.onchange=function(){ drawRelTimeline(select.value) }; drawRelTimeline(select.value);
-}
-function drawRelTimeline(name){
-  var svg=document.getElementById('relSvg'); if(!svg) return;
-  var W=800,H=200,P=30; svg.innerHTML='';
-  var zeroY=H/2; svg.innerHTML+='<line x1="0" y1="'+zeroY+'" x2="'+W+'" y2="'+zeroY+'" stroke="#3b4252" stroke-dasharray="4 4"/>';
-  var pts=relTimeline.map(function(ep,i){ return {x:i,y:(ep.avgRelByPlayer[name]||0)}; }); if(!pts.length) return;
-  var maxX=Math.max(1,pts.length-1), xS=(W-2*P)/maxX, yS=(H-2*P)/10;
-  var path=''; for(var i=0;i<pts.length;i++){ var x=P+i*xS, y=H/2 - pts[i].y*yS; path+=(i===0?'M':'L')+' '+x+' '+y+' '; }
-  var col=(cast[name]&&cast[name].color)?cast[name].color:'#7aa2ff';
-  svg.innerHTML+='<path d="'+path.trim()+'" fill="none" stroke="'+col+'" stroke-width="2"/>';
-  for(i=0;i<pts.length;i++){ var cx=P+i*xS, cy=H/2 - pts[i].y*yS; svg.innerHTML+='<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+col+'"/>'; }
-  svg.innerHTML+='<text x="'+P+'" y="'+(P-8)+'" fill="#aeb4c0" font-size="12">'+name+'</text>';
-  svg.innerHTML+='<text x="'+(W-P)+'" y="'+(H-8)+'" fill="#aeb4c0" font-size="12" text-anchor="end">Episodes ('+pts.length+')</text>';
 }
 
-/* ===== Keep preseason UIs wired ===== */
-function renderEpisodesButton(){ var b=document.getElementById('openEpisodes'); b.style.display='inline-block'; b.textContent='Episode Recaps ('+episodes.length+')'; if(epIndex<0 && episodes.length) epIndex=0; }
+/* ===== Phase 3 (Alt) ===== */
+function runPhase3(){
+  ensureEpisode();
+  if(p3_step===0){
+    addScene('Phase 3 — Final Cut vote.');
+    const raw=simulateVote(players, players);
+    const pairs=raw.map(([v,t])=> v===t? [v, weighted(players.filter(p=>p!==v), c=> (stats[c]?.social||8)*(0.9+Math.random()*0.2))] : [v,t]);
+    let [vw, tied] = tally(pairs, players);
+    addVoteColumn('P3 R1', players, pairs, tied.length===1?vw:('TIE:'+tied.join('=')), null);
 
-/* ===== END ===== */
+    if(tied.length===1){
+      const voteWinner=vw; addScene(`${voteWinner} wins and becomes a finalist.`);
+      const avail = players.filter(p=>p!==voteWinner);
+      const partner = weighted(avail, c=> (stats[c]?.social||8)*relFactor(voteWinner,c));
+      addScene(`${voteWinner} selects ${partner} to join them in the finale.`);
+      finalists=[voteWinner, partner];
+      const bottom3 = players.filter(p=>!finalists.includes(p));
+      const w = weighted(bottom3, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+      const outs = bottom3.filter(x=>x!==w);
+      addScene(`Bottom‑3 challenge: ${bottom3.join(', ')} → ${w} advances; ${outs.join(', ')} join the jury (P3).`);
+      finalists.push(w);
+      outs.forEach(o=>{ eliminated.push(o); jury.push({name:o,phase:3}); losses[o]=(losses[o]||0)+1; });
+      phase=4; round=1; updateProgress(); return;
+    } else if(tied.length===2){
+      const safe=tied.slice(); addScene(`P3 tie: ${safe.join(' & ')} are safe.`);
+      // pick partner among the two safe
+      const picker = weighted(safe, c=> (stats[c]?.social||8)*(0.9+Math.random()*0.2));
+      const partner = safe.find(x=>x!==picker) || safe[0];
+      finalists=[picker, partner];
+      const bottom3 = players.filter(p=>!finalists.includes(p));
+      const w = weighted(bottom3, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+      const outs = bottom3.filter(x=>x!==w);
+      addScene(`Bottom‑3 challenge: ${bottom3.join(', ')} → ${w} advances; ${outs.join(', ')} join the jury (P3).`);
+      finalists.push(w);
+      outs.forEach(o=>{ eliminated.push(o); jury.push({name:o,phase:3}); losses[o]=(losses[o]||0)+1; });
+      phase=4; round=1; updateProgress(); return;
+    } else {
+      // rare: take first two as safe
+      const safe=tied.slice(0,2); finalists=safe.slice();
+      const bottom3 = players.filter(p=>!finalists.includes(p));
+      const w = weighted(bottom3, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+      const outs = bottom3.filter(x=>x!==w);
+      addScene(`Rare multi‑tie: ${safe.join(' & ')} safe; bottom‑3 challenge → ${w} advances.`);
+      finalists.push(w);
+      outs.forEach(o=>{ eliminated.push(o); jury.push({name:o,phase:3}); losses[o]=(losses[o]||0)+1; });
+      phase=4; round=1; updateProgress(); return;
+    }
+  }
+}
+
+/* ===== Finale (Alt) ===== */
+function runFinale(){
+  ensureEpisode();
+  if(!finaleState){
+    if(finalists.length!==3){ addScene('Finale error: not enough finalists.'); return; }
+    const finalistKeys={}; finalists.forEach(f=> finalistKeys[f]=3); // 3 base keys
+    // Distribute 27 jury keys (P1:1 each, P2:2, P3:3)
+    const jm=distributeJuryKeys(finalists, jury, finalistKeys); displayJuryMatrix(jm);
+
+    // Vault choices (unique) near each finalist's expected support
+    const pool=[]; for(let i=3;i<=22;i++) pool.push(i);
+    const expect={}; finalists.forEach(f=> expect[f]=Math.round(6 + (stats[f]?.social||8)*0.6));
+    const chosen=pickVaults(expect, pool);
+    finaleState={finalistKeys, juryMatrix:jm, chosenVaults:chosen, winner:null, step:0};
+    addScene('Jury awards keys. Next: vault choices & reveal.');
+    return;
+  }
+
+  if(finaleState.step===0){
+    const line = finalists.map(f=> `${f}: vault ${finaleState.chosenVaults[f]} (has ${finaleState.finalistKeys[f]} keys)`).join(' | ');
+    addScene(line);
+    // Determine if anyone opens
+    const sorted = finalists.map(n=>({name:n,keys:finaleState.finalistKeys[n],vault:finaleState.chosenVaults[n]})).sort((a,b)=>b.vault-a.vault);
+    const opener = sorted.find(r=>r.keys>=r.vault) || null;
+    finaleState.winner = opener? opener.name : null; finaleState.step=1; return;
+  }
+
+  if(finaleState.step===1){
+    if(finaleState.winner){
+      addScene(`${finaleState.winner} opens the ${finaleState.chosenVaults[finaleState.winner]}-key vault with ${finaleState.finalistKeys[finaleState.winner]} keys — Champion!`);
+    } else {
+      addScene('No vault opens → Final‑3 challenge for the season!');
+      const w = weighted(finalists, x=>(stats[x]?.challenge||8)*(0.85+Math.random()*0.3));
+      addScene(`${w} wins the final challenge and claims the 3‑key vault — Champion!`);
+    }
+    nextBtn.textContent='Simulate Again'; nextBtn.onclick=()=>location.reload();
+    phase=5; // done
+  }
+}
+function pickVaults(expect, pool){
+  const avail=pool.slice(), picked={};
+  Object.keys(expect).sort((a,b)=>expect[b]-expect[a]).forEach(f=>{
+    let best=avail[0], bestDiff=1e9, idx=0;
+    for(let i=0;i<avail.length;i++){ const v=avail[i], d=Math.abs(v-expect[f]); if(d<bestDiff){ bestDiff=d; best=v; idx=i; } }
+    picked[f]=best; avail.splice(idx,1);
+  });
+  return picked;
+}
+
+/* ================= Start Season ================= */
+function startSeason(){
+  if(gameStarted) return;
+  const input=document.getElementById('playerInput').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
+  if(input.length!==13){ alert('Please enter exactly 13 players.'); return; }
+
+  players=input.slice(); initialOrder=input.slice();
+  players.forEach(p=>{
+    keys[p]=[]; stats[p]=stats[p]||{social:8,challenge:8}; rel[p]=rel[p]||{};
+    cast[p]=cast[p]||{photo:'',color:'#7aa2ff'};
+    wins[p]=0; losses[p]=0; keysEarned[p]={P1:0,P2:0}; votesGiven[p]=0; votesReceived[p]=0; juryKeysReceived[p]=0;
+  });
+
+  gameStarted=true;
+  startBtn.style.display='none'; nextBtn.style.display='inline-block';
+  document.getElementById('seasonControls').style.display='none';
+  document.getElementById('castBox').style.display='none';
+  document.getElementById('preseasonBox').style.display='none';
+
+  generateAlliancesPreset();
+  phase=1; round=1;
+  ensureEpisode();
+  addScene('Season begins. Alt Vault rules in effect.');
+  addScene('Alliances formed: '+Object.entries(alliances).map(([k,v])=>`${k}: ${v.join(', ')}`).join(' | '));
+}
+
+/* Alliances */
+function generateAlliancesPreset(){
+  const labels=(SEASON.preset==='duos'? ['A','B','C','D','E','F'] : SEASON.preset==='loners'? ['A','B','C'] : ['A','B','C','D']);
+  alliances={}; labels.forEach(k=>alliances[k]=[]);
+  const sh=shuffle(players);
+  if(SEASON.preset==='duos'){ for(let i=0;i<sh.length;i+=2){ alliances[labels[(i/2)%labels.length]].push(sh[i], sh[i+1]); } }
+  else if(SEASON.preset==='loners'){ for(let i=0;i<sh.length;i++){ alliances[labels[i%labels.length]].push(sh[i]); } }
+  else { for(let i=0;i<sh.length;i++){ alliances[labels[i%labels.length]].push(sh[i]); if(SEASON.preset==='fluid' && Math.random()<0.18){ const other=labels[Math.floor(Math.random()*labels.length)]; if(!alliances[other].includes(sh[i])) alliances[other].push(sh[i]); } } }
+  updateAlliances();
+}
+
+/* Init preseason UIs */
+buildCastGrid(); buildStatsTable(); buildRelFocusList(); renderEpisodeNav();
 </script>
 </body>
 </html>
