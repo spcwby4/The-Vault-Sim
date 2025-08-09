@@ -110,7 +110,7 @@
     <div class="hint">LOCKPICK appears in the voter’s cell if used that round. Order: active/finalists → Phase 3 elim → Phase 2 elim → Phase 1 elim.</div>
   </div>
 
-  <!-- MOVED HERE: Relationships (Live) -->
+  <!-- MOVED: Relationships (Live) under Voting Matrix -->
   <div class="box">
     <h2>Relationships (Live)</h2>
     <div id="relsLive"></div>
@@ -174,6 +174,9 @@ let finaleState = {
 let stats = {};
 let rel = {};   // symmetric: rel[A][B] = -5..+5
 
+// NEW: queue relationship updates so they print between event blocks
+let relUpdateQueue = [];
+
 /* ====== DOM ====== */
 const startBtn = document.getElementById('startBtn');
 const nextBtn  = document.getElementById('nextBtn');
@@ -185,15 +188,23 @@ const statsTableDiv = document.getElementById('statsTable');
 startBtn.onclick = startGame;
 nextBtn.onclick  = nextRound;
 
-/* ====== Helpers ====== */
+/* ====== Logging helpers ====== */
 function log(msg){
   roundsBox.textContent += (roundsBox.textContent ? '\n' : '') + msg;
   roundsBox.scrollTop = roundsBox.scrollHeight;
 }
 function clearLog(){ roundsBox.textContent = '' }
+function queueRelUpdate(msg){ relUpdateQueue.push(msg) }
+function flushRelUpdates(){
+  if(!relUpdateQueue.length) return;
+  log('— Relationship updates —');
+  log(relUpdateQueue.join('\n'));
+  relUpdateQueue = [];
+}
+
+/* ====== Utils ====== */
 function shuffle(arr){ return arr.slice().sort(()=>Math.random()-0.5) }
 function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)) }
-
 function inAlliance(a,b){
   return Object.values(alliances).some(list => list.includes(a) && list.includes(b));
 }
@@ -213,13 +224,13 @@ function incRel(a,b,delta){
   const oldV = getRel(a,b);
   const v = clamp(oldV + delta, -5, 5);
   setRel(a,b,v);
-  // Announce bonds/fights
+  // QUEUE message instead of logging immediately
   if(delta>0){
-    log(`${a} and ${b} strengthen their bond (+${delta} → ${v}).`);
+    queueRelUpdate(`${a} and ${b} strengthen their bond (+${delta} → ${v}).`);
   }else if(delta<0){
-    log(`${a} and ${b} get into a fight (${delta} → ${v}).`);
+    queueRelUpdate(`${a} and ${b} get into a fight (${delta} → ${v}).`);
   }
-  renderRelsLive();
+  renderRelsLive(); // keep panel fresh
 }
 
 function weightedChoice(items, weightArg){
@@ -333,13 +344,12 @@ function renderRelEditorFor(focus){
   html += `</table></div>`;
   relEditorDiv.innerHTML = html;
 
-  // Auto-save on change
+  // Auto-save on change (silent, no spam)
   relEditorDiv.querySelectorAll('.rel-spin').forEach(inp=>{
     inp.addEventListener('input', ()=>{
       const f = inp.getAttribute('data-focus');
       const t = inp.getAttribute('data-target');
       const val = clamp(parseInt(inp.value||'0',10), -5, 5);
-      // No log spam during preseason edits: set directly without incRel log
       setRel(f, t, val);
       renderRelsLive();
     });
@@ -354,12 +364,12 @@ function saveRelAllSweep(){
     const val = clamp(parseInt(inp.value||'0',10), -5, 5);
     setRel(f, t, val);
   });
-  // Sweep through every player to ensure symmetry and persistence
+  // Sweep everyone to enforce symmetry
   names.forEach(f=>{
     const others = names.filter(n=>n!==f);
     others.forEach(t=>{
-      const v = getRel(f,t); // already set
-      setRel(f,t,v);         // enforce symmetry
+      const v = getRel(f,t);
+      setRel(f,t,v);
     });
   });
   log('Saved relationships for ALL players.');
@@ -443,11 +453,11 @@ function renderRelsLive(){
   wrap.innerHTML = html;
 }
 
-/* Render initial empty tables */
+/* Render initial tables */
 buildStatsTable();
 buildRelFocusList();
 
-/* Keep preseason editors in sync with names typed */
+/* Keep preseason editors synced with names typed */
 document.getElementById('playerInput').addEventListener('input', ()=>{
   if(!gameStarted){
     buildStatsTable();
@@ -469,7 +479,7 @@ function startGame(){
   players.forEach(p => keys[p] = []);
   players.forEach(p => { if(!stats[p]) stats[p] = {social:8, challenge:8}; if(!rel[p]) rel[p]={}; });
 
-  // Lock the preseason UIs
+  // Lock preseason UIs
   statsBox.style.display = 'none';
   relsPreBox.style.display = 'none';
 
@@ -668,6 +678,8 @@ function updateProgress(){
 
 /* ====== Phase 1 ====== */
 function runPhase1(){
+  flushRelUpdates(); // pre-events updates
+
   if(round > 4 || Object.values(keys).filter(k=>k.includes('P1')).length >= 8){
     return endPhase1();
   }
@@ -693,6 +705,8 @@ function runPhase1(){
   votePairs.forEach(([v,to])=>{
     if(to===voteWinner && inAlliance(v, voteWinner)) incRel(v, voteWinner, +1);
   });
+
+  flushRelUpdates(); // vote-based updates
 
   let lockUser = null;
   if(lockpickHolder && !lockpickUsed && drawn.includes(lockpickHolder)){
@@ -721,6 +735,7 @@ function runPhase1(){
   }
 
   maybeFormNewAllianceFromBonds();
+  flushRelUpdates(); // alliance-forming updates
 
   updateProgress();
   renderRelsLive();
@@ -746,6 +761,8 @@ function endPhase1(){
 
 /* ====== Phase 2 ====== */
 function runPhase2(){
+  flushRelUpdates(); // pre-events
+
   if(round > 4 || Object.values(keys).filter(k=>k.includes('P2')).length >= 4){
     return endPhase2();
   }
@@ -763,6 +780,8 @@ function runPhase2(){
   votePairs.forEach(([v,to])=>{
     if(to===voteWinner && inAlliance(v, voteWinner)) incRel(v, voteWinner, +1);
   });
+
+  flushRelUpdates(); // vote-based
 
   let lockUser = null;
   if(lockpickHolder && !lockpickUsed && noKey.includes(lockpickHolder) && !keys[lockpickHolder].includes('P2')){
@@ -796,6 +815,8 @@ function runPhase2(){
   }
   log(`${voteWinner} chooses to duel ${opponent} — ${reason}.`);
 
+  flushRelUpdates(); // pick-related (snubs/bonds)
+
   const pWin = duelWinProb(voteWinner, opponent);
   const duelWinner = Math.random() < pWin ? voteWinner : opponent;
   keys[duelWinner].push('P2');
@@ -803,6 +824,7 @@ function runPhase2(){
 
   considerAllianceKicks(voteWinner);
   maybeFormNewAllianceFromBonds();
+  flushRelUpdates(); // post-duel evolution
 
   updateProgress();
   renderRelsLive();
@@ -833,6 +855,8 @@ let p3_duelists = [];
 
 function runPhase3(){
   if(phase3Step === 0){
+    flushRelUpdates(); // pre P3 vote
+
     log(`Phase 3 — Final Cut: Vote step`);
     const votePairsRaw = simulateVote(players, players);
     const votePairs = votePairsRaw.map(([v,to])=>{
@@ -852,15 +876,13 @@ function runPhase3(){
       return [w, t, c];
     })();
 
-    // F4 tie logic
+    // F4 tie handling
     if(players.length===4){
-      // build counts map
       const cm = {}; players.forEach(p=>cm[p]=0); votePairs.forEach(([_,to])=>cm[to]++);
       const vals = Object.values(cm);
       const maxV = Math.max(...vals);
       const tiedAtMax = Object.keys(cm).filter(p=>cm[p]===maxV);
 
-      // Four-way tie
       if(new Set(vals).size===1){
         log(`Final 4 vote is a four‑way tie! All four compete; top three advance.`);
         const perf = players.map(p=>({p, score: (stats[p]?.challenge ?? 8) * (0.8 + Math.random()*0.4)}));
@@ -878,10 +900,9 @@ function runPhase3(){
         return;
       }
 
-      // Two-way tie at the top: the two tied duel for last spot; other two auto-advance
       if(tiedAtMax.length===2){
         const nonTied = players.filter(p=>!tiedAtMax.includes(p));
-        finalists = nonTied.slice(); // both move on
+        finalists = nonTied.slice(); // auto-advance
         log(`Final 4 vote has a two‑way tie between ${tiedAtMax[0]} and ${tiedAtMax[1]}. They duel for the final spot. Others advance: ${nonTied.join(', ')}.`);
 
         const a = tiedAtMax[0], b = tiedAtMax[1];
@@ -910,6 +931,8 @@ function runPhase3(){
 
     addVoteColumn(`P3 Vote`, 'P3', 1, knownVoters, votePairs, voteWinner, null);
 
+    flushRelUpdates(); // after ally selection
+
     p3_duelists = players.filter(p=>p!==voteWinner && p!==p3_chosenAlly);
     log(`${voteWinner} selects ${p3_chosenAlly} to join them. Next: ${p3_duelists[0]} vs ${p3_duelists[1]} for the last spot. Click Next to resolve.`);
     finalists = [p3_voteWinner, p3_chosenAlly];
@@ -920,6 +943,8 @@ function runPhase3(){
   }
 
   if(phase3Step === 1){
+    flushRelUpdates(); // pre duel resolution
+
     const a = p3_duelists[0], b = p3_duelists[1];
     const pWin = duelWinProb(a,b);
     const duelWinner = Math.random() < pWin ? a : b;
@@ -928,6 +953,9 @@ function runPhase3(){
     if(!eliminated.includes(duelLoser)) eliminated.push(duelLoser);
     jury.push({name:duelLoser, phase:3});
     log(`${duelWinner} wins the final duel. ${duelLoser} is eliminated and joins the jury.`);
+
+    flushRelUpdates(); // any post-duel evolutions
+
     updateProgress();
     renderRelsLive();
 
@@ -939,6 +967,8 @@ function runPhase3(){
 
 /* ====== Finale (3 screens: Jury → Open → Winner) ====== */
 function runFinale(){
+  flushRelUpdates(); // pre-jury
+
   if(finaleStep === 0){
     if(!finaleState.finalistKeys){
       finaleState.finalistKeys = {};
@@ -973,6 +1003,8 @@ function runFinale(){
   }
 
   if(finaleStep === 1){
+    flushRelUpdates(); // if any queued
+
     log(`Vault selections: ${finalists.map(f=>`${f} → ${finaleState.chosenVaults[f]} keys`).join(', ')}`);
     finalists.forEach(f=>{
       log(`${f} has ${finaleState.finalistKeys[f]} total keys.`);
@@ -992,6 +1024,8 @@ function runFinale(){
   }
 
   if(finaleStep === 2){
+    flushRelUpdates();
+
     if(!finaleState.winner){
       const fourth = jury.find(j=>j.phase===3)?.name || 'Fourth Place';
       log(`No finalist opened a vault. ${fourth} wins by default.`);
