@@ -59,7 +59,7 @@
       <button id="openSeasonRecap" style="display:none;">Season Recap</button>
       <button id="openStats" style="display:none;">Post‑Season Stats</button>
     </div>
-    <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote, then duel) → Finale (Jury → Open → Winner). F4 special: 2‑way tie = tied duel for last spot; 4‑way tie = top‑3 challenge.</div>
+    <div class="hint">Flow: Phase 1 → Phase 2 → Phase 3 (vote, then duel) → Finale (Jury → Open → Winner). F4: 2‑way tie = tied duel for last spot; 4‑way tie = top‑3 challenge.</div>
   </div>
 
   <div class="rowwrap">
@@ -78,7 +78,7 @@
 
     <div class="box third" id="relsPreBox">
       <h2>Relationships (Preseason)</h2>
-      <div class="hint">Pick a focus player, then set their relationship with everyone else (−5..+5). Bonds &gt; 0, feuds &lt; 0.</div>
+      <div class="hint">Pick a focus player, then set their relationship with everyone else (−5..+5).</div>
       <div class="rowwrap" style="align-items:center">
         <label class="muted">Focus Player</label>
         <select id="relFocus"></select>
@@ -128,7 +128,7 @@
     <div id="juryMatrix"></div>
   </div>
 
-  <!-- Episode / Season / Stats modals (unchanged structure) -->
+  <!-- Episode / Season / Stats modals -->
   <div class="modal-bg" id="episodesModal"><div class="modal">
     <div class="flex-between"><h3>Episode Recaps</h3>
       <div class="btn-row"><button id="prevEp">◀</button><span id="epTitle" class="small"></span><button id="nextEp">▶</button><button onclick="closeModal('episodesModal')">Close</button></div>
@@ -289,38 +289,64 @@ function renderRelsLive(){
 document.getElementById('playerInput').addEventListener('input',()=>{ if(!gameStarted){ buildStatsTable(); buildRelFocusList(); buildCastGrid(); renderRelsLive(); }});
 buildStatsTable(); buildRelFocusList(); buildCastGrid();
 
-/* ====== Start / Next / Reset ====== */
+/* ====== Start / Next / Reset (guarded) ====== */
 function startGame(){
   if(gameStarted) return;
+
   const input=document.getElementById('playerInput').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
-  if(input.length!==12){ alert('Please enter exactly 12 players.'); return }
-  gameStarted=true;
+  if(input.length!==12){ alert('Please enter exactly 12 players.'); return; }
 
-  players=input; initialOrder=input.slice(); knownVoters=input.slice();
-  players.forEach(p=>{ keys[p]=[]; stats[p]??={social:8,challenge:8}; rel[p]??={}; duelWins[p]=0; duelLosses[p]=0; keysEarned[p]={P1:0,P2:0}; votesGiven[p]=0; votesReceived[p]=0; juryKeysReceived[p]=0; cast[p]??={photo:'',color:'#7aa2ff'}; });
+  try{
+    gameStarted=true;
 
-  // lock preseason panels
-  statsBox.style.display='none'; relsPreBox.style.display='none'; document.getElementById('castBox').style.display='none';
+    players=input; initialOrder=input.slice(); knownVoters=input.slice();
+    players.forEach(p=>{
+      keys[p]=[];
+      stats[p]??={social:8,challenge:8};
+      rel[p]??={};
+      duelWins[p]=0; duelLosses[p]=0;
+      keysEarned[p]={P1:0,P2:0};
+      votesGiven[p]=0; votesReceived[p]=0;
+      juryKeysReceived[p]=0;
+      cast[p]??={photo:'',color:'#7aa2ff'};
+    });
 
-  generateAlliances(); updateAlliances(); updateProgress(); renderMasterVoteTable(); renderRelsLive();
+    // lock preseason panels
+    statsBox.style.display='none'; relsPreBox.style.display='none'; document.getElementById('castBox').style.display='none';
 
-  newEpisode(`Episode 1 (Phase 1 R1)`); pushScene('Events');
-  log('Phase 1 begins: The Key Quest starts now.');
+    // Immediate visible log so you know we started
+    newEpisode(`Episode 1 (Phase 1 R1)`); pushScene('Events'); log('Phase 1 begins: The Key Quest starts now.');
 
-  startBtn.style.display='none'; nextBtn.style.display='inline-block'; nextBtn.textContent='Next'; nextBtn.onclick=nextRound;
-  document.getElementById('openEpisodes').style.display='inline-block';
+    generateAlliances(); updateAlliances(); updateProgress(); renderMasterVoteTable(); renderRelsLive();
 
-  nextRound();
+    startBtn.style.display='none'; nextBtn.style.display='inline-block'; nextBtn.textContent='Next'; nextBtn.onclick=nextRound;
+    document.getElementById('openEpisodes').style.display='inline-block';
+
+    // Kick off Round 1
+    nextRound();
+
+  }catch(err){
+    log(`[Error during Start Game] ${err && err.message ? err.message : err}`);
+    console.error(err);
+    gameStarted=false;
+    statsBox.style.display=''; relsPreBox.style.display=''; document.getElementById('castBox').style.display='';
+  }
 }
 
 function nextRound(){
   clearLog();
-  if(phase===1) runPhase1();
-  else if(phase===2) runPhase2();
-  else if(phase===3) runPhase3();
-  else if(phase===4) runFinale();
-  renderEpisodesButton();
+  try{
+    if(phase===1) runPhase1();
+    else if(phase===2) runPhase2();
+    else if(phase===3) runPhase3();
+    else if(phase===4) runFinale();
+    renderEpisodesButton();
+  }catch(err){
+    log(`[Error during Next] ${err && err.message ? err.message : err}`);
+    console.error(err);
+  }
 }
+
 function endGameUI(){ nextBtn.textContent='Simulate Again'; nextBtn.onclick=()=>location.reload(); document.getElementById('openSeasonRecap').style.display='inline-block'; document.getElementById('openStats').style.display='inline-block'; }
 
 /* ====== Voting Core ====== */
@@ -351,8 +377,9 @@ function renderMasterVoteTable(){
 /* ====== Alliances (fluid) ====== */
 function generateAlliances(){
   alliances={};
-  const count=Math.floor(Math.random()*3)+2;
-  const names='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0,count).split('');
+  const count=Math.floor(Math.random()*3)+2; // 2..4
+  // safer: split → slice
+  const names='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').slice(0,count);
   const sh=shuffle(players);
   names.forEach(n=>alliances[n]=[]);
   sh.forEach((p,i)=> alliances[names[i%count]].push(p));
