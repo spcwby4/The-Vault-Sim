@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>The Vault Simulator — Alt Rules (v5.4)</title>
+<title>The Vault Simulator — Alt Rules (v6.0)</title>
 <meta http-equiv="Content-Security-Policy" content="img-src 'self' https: data:;">
 <style>
   :root { --bg:#f6f7fb; --card:#fff; --line:#e5e7eb; --muted:#6b7280; --text:#0f172a; --btn:#111827; --btntext:#fff; --shade:#fafafa; }
@@ -182,7 +182,7 @@ function logEventWithImages(text,urls=[]){
 
 <script>
 /* =========================
-   ALT VAULT — ENGINE v5.4
+   ALT VAULT — ENGINE v6.0
    ========================= */
 const UI = {
   playersInput: document.getElementById('playersInput'),
@@ -208,13 +208,22 @@ const S = {
   p1Jurors: [], p2Jurors: [], p3Jurors: [],
   finalists: [],
   p1Drawn: {},            // rIndex -> [names]
-  lockpickHolder: null,   // never grants key in P2, only control
-  lockpickClueHolder: null, // reserved for future: +50% find
-  voteCols: [],           // ["P1R1", "P1R1 (revote)", ...]
-  voteData: {},           // voterName -> { colLabel: targetName }
-  // events / targeting
+  // Lockpick
+  lockpickHolder: null,
+  lockpickClueHolder: null, // +50% find boost while hidden
+  // Showmances
+  showmances: new Set(),     // "A|B"
+  // Voting viz
+  voteCols: [],
+  voteData: {},
+  // Round biases
   avoidVoteTargets: new Set(),
-  lastAvoidTarget: null
+  targetVoteBoost: null,     // set when a real rally forms
+  lastAvoidTarget: null,
+  // Event cooldown per player -> event key
+  evtCooldown: new Map(),
+  // Phase intro
+  pendingIntro: null,
 };
 
 /* ---------- Theme ---------- */
@@ -238,7 +247,7 @@ function choice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
 function weightPick(items, wfn){ let sum=0; items.forEach(it=>sum+=Math.max(1,wfn(it))); let rr=Math.random()*sum; for(const it of items){ const w=Math.max(1,wfn(it)); if(rr<w) return it; rr-=w; } return items[items.length-1]; }
 
-/* Eligible voting pool per round (for smart house events) */
+/* Eligible voting pool per round (for smart events & rally checks) */
 function eligibleVotePoolForRound(){
   if (S.phase === 1){
     const rIndex=(S.round||1)-1;
@@ -265,7 +274,7 @@ function buildPreseason(){
       name:n, img:photos[i]||'', p1:Array(5).fill(''), p2:Array(5).fill(''), p3:false, alive:true,
       attr:{soc:5,comp:5,strat:5}, rel:{} }));
   }
-  // init relationships at 5 (neutral) 1–10 scale
+  // init relationships at 5 (neutral)
   S.roster.forEach(a=> S.roster.forEach(b=>{ if(a.name!==b.name && typeof a.rel[b.name]!=='number') a.rel[b.name]=5; }));
 
   // Modal
@@ -299,7 +308,7 @@ function buildPreseason(){
   });
   wrapAttr.appendChild(grid);
 
-  // RELATIONSHIPS (new focal editor)
+  // RELATIONSHIPS (focal editor)
   const wrapRel=document.createElement('div');
   const editorBar=document.createElement('div'); editorBar.className='rel-editor';
   const focalSel=document.createElement('select'); focalSel.id='relFocal';
@@ -405,14 +414,13 @@ function voteAmong(voters, targets, forbidSelf=true, tilt='neutral'){
     if(forbidSelf) opts=opts.filter(n=>n!==v.name);
     const scored=opts.map(n=>{
       const t=byName(n);
-      // base strategic pressure
-      let base = 50 + ((t?.attr.strat??5)-5)*4;
-      // relationship (1–10, 5 neutral) -> dislike pushes weight up
-      const rel = v.rel?.[t?.name] ?? 5;
-      base += (5 - rel) * 6; // stronger dislike => higher weight
+      let base = 50 + ((t?.attr.strat??5)-5)*4;     // strategic pressure
+      const rel = v.rel?.[t?.name] ?? 5;            // 1–10 (5 neutral)
+      base += (5 - rel) * 6;                        // dislike -> higher vote weight
       if(tilt==='ally' && a){ base = a.members.has(t.name)? 20: 80; }
       if(tilt==='outside' && a){ base = a.members.has(t.name)? 80: 20; }
-      if(avoid.has(t.name)) base *= 0.1; // smart ice‑out
+      if(avoid.has(t.name)) base *= 0.1;            // ICE-OUT bias
+      if(S.targetVoteBoost === t.name) base *= 1.6; // FOCUS rally bias
       return {name:n, w:Math.max(1,base)};
     });
     map[v.name]=weightPick(scored, s=>s.w).name;
@@ -464,76 +472,189 @@ function renderVoteChart(){
   function td(t){ const el=document.createElement('td'); el.textContent=t; return el; }
 }
 
-/* ---------- Smart House Events (relationships + alliances) ---------- */
-function houseEventsSmart(tag){
-  S.avoidVoteTargets.clear();
-  const pool=alive(); if(pool.length<2) return;
+/* ---------- Expanded House Events ---------- */
 
-  // small social churn (keeps the world alive)
-  const minor=r(0,2);
-  for(let i=0;i<minor;i++){
-    if(Math.random()<0.5){
+// utility
+function pairKey(a,b){ return a<b ? `${a}|${b}` : `${b}|${a}`; }
+function inAlliance(a,b){ return S.alliances.some(al=>al.members.has(a) && al.members.has(b)); }
+
+function pushCooldown(name, key){ S.evtCooldown.set(name, key); }
+function onCooldown(name, key){ return S.evtCooldown.get(name) === key; }
+
+function smartRallyTarget(elig, voters){
+  // Is there a plausible rally FOR someone? majority of voters like them (avgRel>=6) or share alliances?
+  const scored = elig.map(t=>{
+    let relSum=0,c=0, allyHits=0;
+    voters.forEach(v=>{
+      if(v.name===t.name) return;
+      const rv = v.rel?.[t.name]; if(typeof rv==='number'){ relSum+=rv; c++; }
+      if(inAlliance(v.name,t.name)) allyHits++;
+    });
+    const avgRel = c? relSum/c : 5;
+    const support = avgRel*1.5 + allyHits; // simple blend
+    return {t, support, avgRel, allyHits};
+  }).sort((a,b)=>b.support-a.support);
+  const top = scored[0];
+  const majorityNeeded = Math.ceil(voters.length/2);
+  if(!top) return null;
+  // majority if at least half have rel >=6 OR allyHits covers half
+  const sufficientAllies = top.allyHits >= majorityNeeded/2;
+  const sufficientRel = top.avgRel >= 6;
+  return (sufficientAllies || sufficientRel) ? top.t : null;
+}
+
+function houseEvents(tag){
+  S.avoidVoteTargets.clear();
+  S.targetVoteBoost = null;
+
+  const pool = alive();
+  const elig = eligibleVotePoolForRound();
+  if (!pool.length || !elig.length) return;
+
+  const voters = (S.phase === 1) ? S.roster : alive();
+
+  // Up to 3 events
+  const count = r(2,3);
+  for(let i=0;i<count;i++){
+    const roll = Math.random();
+
+    if (roll < 0.18){
+      // Social snack share
       const a=choice(pool), b=choice(pool.filter(x=>x!==a));
       a.rel[b.name]=clamp((a.rel[b.name]??5)+r(1,3),1,10);
       b.rel[a.name]=clamp((b.rel[a.name]??5)+r(1,3),1,10);
-      logEventWithImages(`${tag}: ${a.name} and ${b.name} bond over game talk.`, [a.img||'', b.img||'']);
-    }else{
+      logEventWithImages(`${tag}: ${a.name} and ${b.name} secretly share snacks and bond.`, [a.img||'', b.img||'']);
+
+    } else if (roll < 0.32){
+      // Muffin theft (conflict)
       const a=choice(pool), b=choice(pool.filter(x=>x!==a));
-      a.rel[b.name]=clamp((a.rel[b.name]??5)-r(1,3),1,10);
-      b.rel[a.name]=clamp((b.rel[a.name]??5)-r(1,3),1,10);
-      logEventWithImages(`${tag}: ${a.name} and ${b.name} have a tense exchange.`, [a.img||'', b.img||'']);
+      if(!onCooldown(b.name,'muffin')){
+        b.rel[a.name]=clamp((b.rel[a.name]??5)-r(2,4),1,10);
+        logEventWithImages(`${tag}: ${a.name} eats ${b.name}'s muffin. ${b.name} is fuming.`, [a.img||'', b.img||'']);
+        pushCooldown(b.name,'muffin');
+      }
+
+    } else if (roll < 0.42){
+      // Mattress flip (prank/conflict)
+      const a=choice(pool), b=choice(pool.filter(x=>x!==a));
+      if(!onCooldown(b.name,'mattress')){
+        b.rel[a.name]=clamp((b.rel[a.name]??5)-r(2,4),1,10);
+        logEventWithImages(`${tag}: ${a.name} flips ${b.name}'s mattress as a prank. Trust drops.`, [a.img||'', b.img||'']);
+        pushCooldown(b.name,'mattress');
+      }
+
+    } else if (roll < 0.52){
+      // Alliance recruit/expel
+      if(S.alliances.length){
+        const pick=choice(S.alliances);
+        if(Math.random()<0.5 && pick.members.size>2){
+          const leaver=choice([...pick.members]); pick.members.delete(leaver);
+          logEventWithImages(`${tag}: ${leaver} is quietly pushed out of ${pick.name}.`, [byName(leaver).img||'']);
+        } else {
+          const opts=pool.map(p=>p.name).filter(n=>!pick.members.has(n));
+          if(opts.length){ const joiner=choice(opts); pick.members.add(joiner); logEventWithImages(`${tag}: ${joiner} is recruited into ${pick.name}.`, [byName(joiner).img||'']); }
+        }
+        renderAlliances();
+      }
+
+    } else if (roll < 0.60){
+      // Final-2 deal
+      const a=choice(pool), b=choice(pool.filter(x=>x!==a));
+      a.rel[b.name]=clamp((a.rel[b.name]??5)+r(1,2),1,10);
+      b.rel[a.name]=clamp((b.rel[a.name]??5)+r(1,2),1,10);
+      logEventWithImages(`${tag}: ${a.name} and ${b.name} make a secret Final‑2 promise.`, [a.img||'', b.img||'']);
+
+    } else if (roll < 0.68){
+      // Vote leak
+      const a=choice(pool), b=choice(pool.filter(x=>x!==a));
+      a.rel[b.name]=clamp((a.rel[b.name]??5)-r(2,3),1,10);
+      logEventWithImages(`${tag}: ${a.name} leaks ${b.name}'s vote. Trust erodes.`, [a.img||'', b.img||'']);
+
+    } else if (roll < 0.76){
+      // Public apology
+      const a=choice(pool), b=choice(pool.filter(x=>x!==a));
+      a.rel[b.name]=clamp((a.rel[b.name]??5)+r(1,3),1,10);
+      b.rel[a.name]=clamp((b.rel[a.name]??5)+r(1,3),1,10);
+      logEventWithImages(`${tag}: ${a.name} publicly apologizes to ${b.name}. Tension eases.`, [a.img||'', b.img||'']);
+
+    } else if (roll < 0.82){
+      // Move beds (disrupt duo)
+      const a=choice(pool), b=choice(pool.filter(x=>x!==a));
+      a.rel[b.name]=clamp((a.rel[b.name]??5)-1,1,10);
+      b.rel[a.name]=clamp((b.rel[a.name]??5)-1,1,10);
+      logEventWithImages(`${tag}: Beds are shuffled to separate ${a.name} and ${b.name}'s late‑night talks.`, [a.img||'', b.img||'']);
+
+    } else if (roll < 0.88){
+      // Showmance start/end rules
+      const a=choice(pool), b=choice(pool.filter(x=>x!==a));
+      const key=pairKey(a.name,b.name);
+      if(!S.showmances.has(key) && (a.rel[b.name]+b.rel[a.name])>=17 && Math.random()<0.3){
+        S.showmances.add(key);
+        logEventWithImages(`${tag}: A showmance starts between ${a.name} and ${b.name}.`, [a.img||'', b.img||'']);
+      } else if(S.showmances.has(key) && Math.random()<0.3){
+        S.showmances.delete(key);
+        logEventWithImages(`${tag}: The showmance between ${a.name} and ${b.name} ends.`, [a.img||'', b.img||'']);
+      }
+
+    } else if (roll < 0.94){
+      // Party / milestone
+      pool.forEach(p=>{ p.attr.soc = clamp(p.attr.soc + (Math.random()<0.4?1:0),1,10); });
+      logEventWithImages(`${tag}: House throws a themed party. Social vibes rise.`, []);
+
+    } else {
+      // Strategic meta: ICE-OUT or genuine FOCUS rally
+      // Compute "problem" weights for ICE-OUT
+      const scored = elig.map(t=>{
+        let sum=0,c=0, allyHits=0;
+        voters.forEach(v=>{
+          if(v.name===t.name) return;
+          const rv=v.rel?.[t.name]; if(typeof rv==='number'){ sum+=rv; c++; }
+          if(inAlliance(v.name,t.name)) allyHits++;
+        });
+        const avgRel = c? (sum/c) : 5;
+        const threat = (t.attr.comp-5)*1.2 + (t.attr.strat-5)*1.0;
+        const cover = allyHits;
+        let w = (6 - avgRel)*10 + threat*6 - cover*3;
+        if(S.lastAvoidTarget===t.name) w *= 0.5;
+        return {t,w:Math.max(1,Math.round(w))};
+      });
+
+      // 50/50: genuine FOCUS rally (if exists) else ICE-OUT
+      if(Math.random()<0.5){
+        const rally = smartRallyTarget(elig, voters);
+        if(rally){
+          S.targetVoteBoost = rally.name;
+          const msg = (S.phase===2)
+            ? `${tag}: A real rally forms to push ${rally.name} forward among the no‑key players.`
+            : (S.phase===1
+              ? `${tag}: A majority whispers to push ${rally.name} forward from the drawn group.`
+              : `${tag}: The house coalesces around backing ${rally.name}.`);
+          logEventWithImages(msg, [rally.img||'']);
+          continue;
+        }
+      }
+      const avoidPick = weightPick(scored, s=>s.w).t;
+      S.avoidVoteTargets.add(avoidPick.name);
+      S.lastAvoidTarget = avoidPick.name;
+      const msg = (S.phase===2)
+        ? `${tag}: Talk spreads to avoid voting for ${avoidPick.name} among the no‑key players.`
+        : (S.phase===1
+          ? `${tag}: The house quietly agrees to avoid voting for ${avoidPick.name} from the drawn group.`
+          : `${tag}: The house leans away from voting ${avoidPick.name}.`);
+      logEventWithImages(msg, [avoidPick.img||'']);
     }
-  }
-
-  const elig = eligibleVotePoolForRound();
-  if(!elig.length) return;
-
-  const voters = (S.phase===1) ? S.roster : alive();
-  const allySets = S.alliances.map(a=>a.members);
-  function allyCoverage(candidateName){
-    let hits=0; voters.forEach(v=>{
-      const has=allySets.some(set=>set.has(v.name)&&set.has(candidateName));
-      if(has) hits++;
-    }); return hits;
-  }
-
-  const scored = elig.map(t=>{
-    // average relationship from voters -> t (1–10)
-    let sum=0,c=0; voters.forEach(v=>{ if(v.name!==t.name){ const rv=v.rel?.[t.name]; if(typeof rv==='number'){ sum+=rv; c++; } }});
-    const avgRel = c? (sum/c) : 5;
-    const threat = (t.attr.comp-5)*1.2 + (t.attr.strat-5)*1.0;
-    const cover = allyCoverage(t.name); // many allies among voters => protected
-    let w = 0;
-    w += (6 - avgRel) * 10;    // worse sentiment raises weight (6 so slightly anti-bias to “meh”)
-    w += threat * 6;           // threat boost
-    w -= cover * 3;            // alliance protection
-    if(S.lastAvoidTarget === t.name) w *= 0.5; // cooldown
-    w = Math.max(1, Math.round(w));
-    return {t,w, avgRel:avgRel.toFixed(1)};
-  });
-
-  const target = weightPick(scored, s=>s.w)?.t;
-  if(!target) return;
-  S.avoidVoteTargets.add(target.name);
-  S.lastAvoidTarget = target.name;
-
-  if (S.phase === 1){
-    logEventWithImages(`${tag}: The house quietly agrees to avoid voting for ${target.name} from the drawn group this round.`, [target.img||'']);
-  } else if (S.phase === 2){
-    logEventWithImages(`${tag}: Talk spreads to avoid voting for ${target.name} among the no‑key players.`, [target.img||'']);
-  } else {
-    logEventWithImages(`${tag}: The house leans away from voting ${target.name} right now.`, [target.img||'']);
   }
 }
 
-/* ---------- Lockpick (fixed: never grants a P2 key) ---------- */
+/* ---------- Lockpick (find + P2 ally/keep logic) ---------- */
 function tryFindLockpick(phase, round){
-  // Only P1 R1–R4 and P2 R1–R4; not in R5; 1 holder at a time
   if(!((phase===1 && round<=4)||(phase===2 && round<=4))) return;
   if(S.lockpickHolder) return;
-  if(Math.random()<0.33){
+  const boost = S.lockpickClueHolder ? 1.5 : 1.0;
+  if(Math.random()<0.33*boost){
     const finder=choice(alive());
     S.lockpickHolder=finder.name;
+    S.lockpickClueHolder=null;
     logEventWithImages(`${finder.name} finds a Lockpick. It can be used before votes are read to take control. (Not allowed in Last Chance rounds.)`, [finder.img||'']);
   }
 }
@@ -546,15 +667,14 @@ function phase1Round(){
   const rIndex=(S.round||1)-1;
 
   if(S.round<=4){
-    // draw cache
+    // draw (cached)
     let drawn;
     if(!S.p1Drawn[rIndex]){
       const noKey = alive().filter(p=>!p.p1.includes('V') && !p.p1.includes('C'));
       drawn = (S.round===4) ? noKey : shuffle(noKey).slice(0,6);
       S.p1Drawn[rIndex]=drawn.map(p=>p.name);
-    } else {
-      drawn = S.p1Drawn[rIndex].map(byName);
-    }
+    } else drawn = S.p1Drawn[rIndex].map(byName);
+
     logEventWithImages(
       (S.round===4)
         ? `P1 R${S.round}: Round 4 exception — all without a P1 key are drawn.`
@@ -562,10 +682,10 @@ function phase1Round(){
       drawn.map(p=>p.img||'')
     );
 
-    // Smart house events influence this round
-    houseEventsSmart(`P1 R${S.round} house event`);
+    // House events (influence this round)
+    houseEvents(`P1 R${S.round} house event`);
 
-    // Lockpick: if holder is drawn, they may use it to secure the **vote key** (not challenge)
+    // Lockpick (vote key secure only if holder is drawn)
     tryFindLockpick(1,S.round);
     let forcedVoteKeyWinner=null;
     if(S.lockpickHolder && S.round<=4){
@@ -654,7 +774,7 @@ function phase1Round(){
     while(alive().length>9){ const p=choice(alive()); p.alive=false; S.p1Jurors.push(p.name); }
     while(alive().length<9){ const dead=S.roster.filter(p=>!p.alive && (p.p1.includes('V')||p.p1.includes('C'))); const p=choice(dead); if(p){ p.alive=true; const i=S.p1Jurors.indexOf(p.name); if(i>-1) S.p1Jurors.splice(i,1);} else break; }
     S.phase=2; S.round=1; UI.phaseLabel.textContent='Phase 2 — Round 1 of 5';
-    logEventWithImages(`Phase 2 begins. Rounds 1–4 vote→duel. Round 5: Last Chance Challenge.`,[]);
+    S.pendingIntro = {phase:2, text:'Phase 2 begins. R1–R4: house votes a controller who chooses a duel (or lockpick grants control). R5: Last Chance Challenge.'};
   }
 }
 
@@ -666,17 +786,44 @@ function phase2Round(){
   const rIndex=(S.round||1)-1;
 
   if(S.round<=4){
-    // Smart events BEFORE vote (so avoid list influences vote)
-    houseEventsSmart(`P2 R${S.round} house event`);
+    // Phase intro page?
+    if(S.pendingIntro){ logEventWithImages(S.pendingIntro.text, []); S.pendingIntro=null; return; }
 
-    // Lockpick: holder may take control (but NEVER gets a key automatically)
+    // House events BEFORE vote
+    houseEvents(`P2 R${S.round} house event`);
+
+    // Lockpick (ally/keep logic)
     tryFindLockpick(2,S.round);
     let controller=null;
     if(S.lockpickHolder && S.round<=4){
-      controller=byName(S.lockpickHolder);
-      logEventWithImages(`${controller.name} uses the Lockpick before votes are read and gains control to set the duel.`, [controller.img||'']);
-      // keep holder (they can’t use it again); consume the lockpick
-      S.lockpickHolder=null;
+      const holder=byName(S.lockpickHolder);
+      const players=alive();
+      const elig=players.filter(p=>!p.p2.includes('K'));
+
+      if(!holder.p2.includes('K')){
+        controller=holder;
+        logEventWithImages(`${holder.name} uses the Lockpick before votes are read and takes control to set the duel.`, [holder.img||'']);
+        S.lockpickHolder=null; // consumed
+      } else {
+        // give to ally if possible, else keep
+        const isAlly=(n)=>S.alliances.some(a=>a.members.has(holder.name)&&a.members.has(n));
+        const allyOpts=elig.filter(p=>isAlly(p.name));
+        if(allyOpts.length && Math.random()<0.8){
+          // best ally by holder's relationship & lower strat
+          let best=allyOpts[0], score=-1;
+          allyOpts.forEach(p=>{
+            const rel=holder.rel?.[p.name]??5;
+            const s = rel*2 + (10 - p.attr.strat);
+            if(s>score){best=p; score=s;}
+          });
+          controller=best;
+          logEventWithImages(`${holder.name} uses the Lockpick on ally ${best.name}, giving them control to set the duel.`, [holder.img||'', best.img||'']);
+          S.lockpickHolder=null; // consumed
+        } else {
+          logEventWithImages(`${holder.name} decides to keep the Lockpick for a later round.`, [holder.img||'']);
+          // Do not clear holder (kept)
+        }
+      }
     }
 
     const players=alive(); const elig=players.filter(p=>!p.p2.includes('K'));
@@ -684,7 +831,7 @@ function phase2Round(){
 
     let voteWinner=null;
     if(controller){
-      voteWinner=controller; // controller sets duel, but still no key unless they win the duel
+      voteWinner=controller; // sets duel, no free key
     } else {
       const map=voteAmong(voters, elig, true, 'outside');
       addVoteColumn(`P2R${S.round}`, map, voters);
@@ -702,12 +849,11 @@ function phase2Round(){
       } else if (tied.length===3){
         logEventWithImages(`Three-way tie among ${tied.join(', ')}. Triple duel!`, tied.map(n=>byName(n).img||''));
         const duelWinner=weightPick(tied.map(byName), p=>Math.max(1,p.attr.comp));
-        // Mark P2 key ONLY for duel winner
         if(!duelWinner.p2.includes('K')) duelWinner.p2[rIndex]='K';
         logEventWithImages(`${duelWinner.name} wins the triple duel and the Phase 2 key.`, [duelWinner.img||'']);
         renderProgress();
         S.round++; UI.phaseLabel.textContent=`Phase 2 — Round ${Math.min(S.round,5)} of 5`;
-        if(S.round===5) logEventWithImages(`P2 R5 — Last Chance Challenge: the 5 without P2 keys compete.`,[]);
+        if(S.round===5) S.pendingIntro={phase:2,text:'P2 R5 — Last Chance Challenge: the 5 without P2 keys compete.'};
         return;
       } else {
         const tiedSet=new Set(tied);
@@ -723,13 +869,13 @@ function phase2Round(){
       }
     }
 
-    // Vote winner chooses opponent among elig, avoiding close allies if possible
+    logEventWithImages(`House selects ${voteWinner.name} to set the duel.`, [voteWinner.img||'']);
+
     const options=elig.filter(p=>p.name!==voteWinner.name);
     const ally=S.alliances.find(a=>a.members.has(voteWinner.name));
     const opponent = ally ? (choice(options.filter(p=>!ally.members.has(p.name)) || options)) : choice(options);
     logEventWithImages(`${voteWinner.name} chooses to duel ${opponent.name}.`, [voteWinner.img||'', opponent.img||'']);
 
-    // Duel occurs; ONLY duel winner gets a P2 key (guard against duplicates)
     const duelWinner=weightPick([voteWinner,opponent], p=>Math.max(1,p.attr.comp + (p.attr.strat-5)*1.5));
     if(!duelWinner.p2.includes('K')) duelWinner.p2[rIndex]='K';
     logEventWithImages(`${duelWinner.name} wins the duel and the Phase 2 key.`, [duelWinner.img||'']);
@@ -737,8 +883,11 @@ function phase2Round(){
     renderProgress();
 
     S.round++; UI.phaseLabel.textContent=`Phase 2 — Round ${Math.min(S.round,5)} of 5`;
-    if(S.round===5) logEventWithImages(`P2 R5 — Last Chance Challenge: the 5 without P2 keys compete.`,[]);
+    if(S.round===5) S.pendingIntro={phase:2,text:'P2 R5 — Last Chance Challenge: the 5 without P2 keys compete.'};
   } else if (S.round===5){
+    UI.events.innerHTML='';
+    if(S.pendingIntro){ logEventWithImages(S.pendingIntro.text, []); S.pendingIntro=null; return; }
+
     const noP2=alive().filter(p=>!p.p2.includes('K'));
     const pool = noP2.length>5 ? shuffle(noP2).slice(0,5) : noP2;
     logEventWithImages(`Last Chance Challenge among: ${pool.map(p=>p.name).join(', ')}`, pool.map(p=>p.img||''));
@@ -754,7 +903,7 @@ function phase2Round(){
     while(alive().length>5){ const p=choice(alive()); p.alive=false; S.p2Jurors.push(p.name); }
     while(alive().length<5){ const dead=S.roster.filter(p=>!p.alive && (p.p1.some(x=>x)&&p.p2.some(x=>x))); const p=choice(dead); if(p){ p.alive=true; const i=S.p2Jurors.indexOf(p.name); if(i>-1) S.p2Jurors.splice(i,1);} else break; }
     S.phase=3; S.round=1; UI.phaseLabel.textContent='Phase 3 — Final Cut';
-    logEventWithImages(`Phase 3 begins. Vote winner advances and brings one; remaining three compete for the last spot.`,[]);
+    S.pendingIntro={phase:3,text:'Phase 3 — Final Cut. House vote picks one finalist (who brings one); remaining three compete for the last spot.'};
   }
 }
 
@@ -763,10 +912,11 @@ function phase2Round(){
    ====================== */
 function phase3Run(){
   UI.events.innerHTML='';
-  const five=alive();
+  if(S.pendingIntro){ logEventWithImages(S.pendingIntro.text, []); S.pendingIntro=null; return; }
 
-  // Optional: one smart event before Final Cut vote
-  houseEventsSmart(`P3 house event`);
+  const five=alive();
+  // One last events pass
+  houseEvents(`P3 house event`);
 
   // House vote for vote winner
   const map=(function(){ const res={}; five.forEach(v=>{
@@ -801,7 +951,7 @@ function phase3Run(){
 }
 
 /* ======================
-   FINALE — VAULT (uses 1–10 rel scale)
+   FINALE — VAULT (1–10 rel scale)
    ====================== */
 function runFinale(){
   const F=S.finalists;
@@ -839,7 +989,7 @@ function runFinale(){
 
   renderJuryMatrix(perJuror, budgets, F, finalistTotals);
 
-  // Perception model (finalists estimate)
+  // Perception model
   function estimateJuryKeysFor(f){
     let exp=0, relAvg=0, count=0;
     budgets.forEach((b,jName)=>{
@@ -851,8 +1001,8 @@ function runFinale(){
     });
     const avgRel = count? (relAvg/count) : 5;
     let risk = 0;
-    if(avgRel < 4.5) risk -= 1;                // cold jury → safe
-    if(f.attr.strat >= 8 && avgRel >= 5.5) risk += 1; // savvy + warmth → bold
+    if(avgRel < 4.5) risk -= 1;
+    if(f.attr.strat >= 8 && avgRel >= 5.5) risk += 1;
     const noiseRange = (f.attr.strat>=8)? 1.5 : 2.5;
     const noise = (Math.random()*2*noiseRange - noiseRange);
     return { estimate: exp + noise, avgRel, risk };
@@ -931,7 +1081,9 @@ function renderJuryMatrix(perJuror, budgets, finalists, finalistTotals){
 /* ---------- Wiring ---------- */
 function resetAll(){
   S.phase=0; S.round=0; S.roster=[]; S.alliances=[]; S.p1Jurors=[]; S.p2Jurors=[]; S.p3Jurors=[]; S.finalists=[]; S.p1Drawn={};
-  S.lockpickHolder=null; S.lockpickClueHolder=null; S.voteCols=[]; S.voteData={}; S.avoidVoteTargets.clear(); S.lastAvoidTarget=null;
+  S.lockpickHolder=null; S.lockpickClueHolder=null; S.showmances=new Set();
+  S.voteCols=[]; S.voteData={}; S.avoidVoteTargets.clear(); S.targetVoteBoost=null; S.lastAvoidTarget=null;
+  S.evtCooldown.clear(); S.pendingIntro=null;
   UI.events.innerHTML=''; UI.juryWrap.innerHTML=''; UI.progressBody.innerHTML=''; UI.phaseLabel.textContent='';
   UI.voteChart.innerHTML='';
   UI.nextBtn.classList.add('hidden'); UI.againBtn.classList.add('hidden');
@@ -955,9 +1107,18 @@ function startGame(){
   logEventWithImages('Phase 1 begins. R1–R4: draw 6, vote, challenge. R5: Last Chance Vote.',[]);
 }
 function nextStep(){
-  if(S.phase===1) return phase1Round();
-  if(S.phase===2) return phase2Round();
-  if(S.phase===3) return phase3Run();
+  if(S.phase===1){
+    if(S.pendingIntro){ logEventWithImages(S.pendingIntro.text, []); S.pendingIntro=null; return; }
+    return phase1Round();
+  }
+  if(S.phase===2){
+    if(S.pendingIntro){ logEventWithImages(S.pendingIntro.text, []); S.pendingIntro=null; return; }
+    return phase2Round();
+  }
+  if(S.phase===3){
+    if(S.pendingIntro){ logEventWithImages(S.pendingIntro.text, []); S.pendingIntro=null; return; }
+    return phase3Run();
+  }
 }
 function simulateAgain(){
   const names=S.roster.map(p=>p.name), imgs=S.roster.map(p=>p.img);
